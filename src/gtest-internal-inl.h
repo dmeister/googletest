@@ -550,6 +550,9 @@ class GTEST_API_ UnitTestImpl {
 
   // Gets the elapsed time, in milliseconds.
   TimeInMillis elapsed_time() const { return elapsed_time_; }
+  
+  // Gets the start datetime, in milliseconds.
+  TimeInMillis start_datetime() const { return start_datetime_; }
 
   // Returns true iff the unit test passed (i.e. all test cases passed).
   bool Passed() const { return !Failed(); }
@@ -882,6 +885,9 @@ class GTEST_API_ UnitTestImpl {
 
   // How long the test took to run, in milliseconds.
   TimeInMillis elapsed_time_;
+  
+  // Start timestamp, in milliseconds.
+  TimeInMillis start_datetime_;
 
 #if GTEST_HAS_DEATH_TEST
   // The decomposed components of the gtest_internal_run_death_test flag,

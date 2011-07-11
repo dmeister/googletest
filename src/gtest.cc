@@ -3199,6 +3199,26 @@ std::string FormatTimeInMillisAsSeconds(TimeInMillis ms) {
   return ss.str();
 }
 
+std::string FormatDateTimeAsISO8601(TimeInMillis ms) {
+    // using non-reentrant version as localtime_r is not portable
+    time_t seconds = ms / 1000;
+    struct tm* timestruct = localtime(&seconds);
+    if (timestruct == NULL) {
+        // invalid ms value
+        return "";
+    }
+    char dateString[32];
+    // YYYY-MM-DDThh:mm:ss
+    sprintf(dateString,"%d-%02d-%02dT%02d:%02d:%02d", 
+        timestruct->tm_year + 1900,
+        timestruct->tm_mon + 1,
+        timestruct->tm_mday,
+        timestruct->tm_hour,
+        timestruct->tm_min,
+        timestruct->tm_sec);
+    return dateString;
+}
+
 // Streams an XML CDATA section, escaping invalid CDATA sequences as needed.
 void XmlUnitTestResultPrinter::OutputXmlCDataSection(::std::ostream* stream,
                                                      const char* data) {
@@ -3295,11 +3315,12 @@ void XmlUnitTestResultPrinter::PrintXmlUnitTest(FILE* out,
   fprintf(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
   fprintf(out,
           "<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" "
-          "errors=\"0\" time=\"%s\" ",
+          "errors=\"0\" time=\"%s\" datetime=\"%s\" ",
           unit_test.total_test_count(),
           unit_test.failed_test_count(),
           unit_test.disabled_test_count(),
-          FormatTimeInMillisAsSeconds(unit_test.elapsed_time()).c_str());
+          FormatTimeInMillisAsSeconds(unit_test.elapsed_time()).c_str(),
+          FormatDateTimeAsISO8601(unit_test.start_datetime()).c_str());
   if (GTEST_FLAG(shuffle)) {
     fprintf(out, "random_seed=\"%d\" ", unit_test.random_seed());
   }
@@ -3696,6 +3717,10 @@ internal::TimeInMillis UnitTest::elapsed_time() const {
   return impl()->elapsed_time();
 }
 
+internal::TimeInMillis UnitTest::start_datetime() const {
+    return impl()->start_datetime();
+}
+
 // Returns true iff the unit test passed (i.e. all test cases passed).
 bool UnitTest::Passed() const { return impl()->Passed(); }
 
@@ -3966,6 +3991,7 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
       random_seed_(0),  // Will be overridden by the flag before first use.
       random_(0),  // Will be reseeded before first use.
       elapsed_time_(0),
+      start_datetime_(0),
 #if GTEST_HAS_DEATH_TEST
       internal_run_death_test_flag_(NULL),
       death_test_factory_(new DefaultDeathTestFactory),
@@ -4196,6 +4222,7 @@ bool UnitTestImpl::RunAllTests() {
 
   TestEventListener* repeater = listeners()->repeater();
 
+  start_datetime_ = GetTimeInMillis();
   repeater->OnTestProgramStart(*parent_);
 
   // How many times to repeat the tests?  We don't want to repeat them
