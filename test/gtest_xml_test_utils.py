@@ -66,7 +66,6 @@ class GTestXMLTestCase(gtest_test_utils.TestCase):
        order of the children as they are not guaranteed to be in any
        particular order.
     """
-
     if expected_node.nodeType == Node.CDATA_SECTION_NODE:
       self.assertEquals(Node.CDATA_SECTION_NODE, actual_node.nodeType)
       self.assertEquals(expected_node.nodeValue, actual_node.nodeValue)

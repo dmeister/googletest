@@ -404,8 +404,12 @@ class GTEST_API_ Test {
   // is the user's responsibility to restrict their values to 32-bit ints
   // if they intend them to be used with Greenspan.
   static void RecordProperty(const char* key, const char* value);
-  static void RecordProperty(const char* key, int value);
 
+  template <typename T> static void RecordProperty(const char* key, const T& value) {
+   Message value_message;
+   value_message << value;
+   RecordProperty(key, value_message.GetString().c_str());
+ }
  protected:
   // Creates a Test object.
   Test();

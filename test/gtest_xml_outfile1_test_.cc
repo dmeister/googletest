@@ -47,3 +47,11 @@ class PropertyOne : public testing::Test {
 TEST_F(PropertyOne, TestSomeProperties) {
   RecordProperty("TestSomeProperty", 1);
 }
+
+TEST_F(PropertyOne, TestBooleanProperties) {
+  RecordProperty("TestBooleanProperty", true);
+}
+
+TEST_F(PropertyOne, TestDoubleProperties) {
+  RecordProperty("TestDoubleProperty", 42.5);
+}

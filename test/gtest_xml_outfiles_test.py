@@ -45,9 +45,11 @@ GTEST_OUTPUT_1_TEST = "gtest_xml_outfile1_test_"
 GTEST_OUTPUT_2_TEST = "gtest_xml_outfile2_test_"
 
 EXPECTED_XML_1 = """<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="1" failures="0" disabled="0" errors="0" time="*" name="AllTests">
-  <testsuite name="PropertyOne" tests="1" failures="0" disabled="0" errors="0" time="*">
+<testsuites tests="3" failures="0" disabled="0" errors="0" time="*" name="AllTests">
+  <testsuite name="PropertyOne" tests="3" failures="0" disabled="0" errors="0" time="*">
     <testcase name="TestSomeProperties" status="run" time="*" classname="PropertyOne" SetUpProp="1" TestSomeProperty="1" TearDownProp="1" />
+    <testcase name="TestBooleanProperties" status="run" time="*" classname="PropertyOne" SetUpProp="1" TestBooleanProperty="true" TearDownProp="1" />
+    <testcase name="TestDoubleProperties" status="run" time="*" classname="PropertyOne" SetUpProp="1" TestDoubleProperty="42.5" TearDownProp="1" />
   </testsuite>
 </testsuites>
 """

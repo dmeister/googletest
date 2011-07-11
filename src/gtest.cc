@@ -1920,13 +1920,6 @@ void Test::RecordProperty(const char* key, const char* value) {
   UnitTest::GetInstance()->RecordPropertyForCurrentTest(key, value);
 }
 
-// Allows user supplied key value pairs to be recorded for later output.
-void Test::RecordProperty(const char* key, int value) {
-  Message value_message;
-  value_message << value;
-  RecordProperty(key, value_message.GetString().c_str());
-}
-
 namespace internal {
 
 void ReportFailureInUnknownLocation(TestPartResult::Type result_type,
