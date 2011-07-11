@@ -4172,6 +4172,15 @@ bool UnitTestImpl::RunAllTests() {
   in_subprocess_for_death_test = (internal_run_death_test_flag_.get() != NULL);
 #endif  // GTEST_HAS_DEATH_TEST
 
+  if (Passed() && test_cases_.size() == 0) {
+      // Sometimes a user links gtest_main.cc with the wrong files and no test is
+      // defined.  The test programs will pass in this case since there's no
+      // assertion failure. This prevents that the test runs passes.
+      ColoredPrintf(COLOR_RED, "\nInvalid test binary. No tests defined. Please fix this\n");
+      fflush(stdout);
+      exit(EXIT_FAILURE);        
+  }
+
   const bool should_shard = ShouldShard(kTestTotalShards, kTestShardIndex,
                                         in_subprocess_for_death_test);
 
@@ -4254,7 +4263,7 @@ bool UnitTestImpl::RunAllTests() {
     if (!Passed()) {
       failed = true;
     }
-
+    
     // Restores the original test order after the iteration.  This
     // allows the user to quickly repro a failure that happens in the
     // N-th iteration without repeating the first (N - 1) iterations.

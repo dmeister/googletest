@@ -118,7 +118,7 @@ if (gtest_build_tests)
   cxx_test(gtest-listener_test gtest_main)
   cxx_test(gtest_main_unittest gtest_main)
   cxx_test(gtest-message_test gtest_main)
-  cxx_test(gtest_no_test_unittest gtest)
+  cxx_test(gtest_expect_before_tests_unittest gtest)
   cxx_test(gtest-options_test gtest_main)
   cxx_test(gtest-param-test_test gtest
     test/gtest-param-test2_test.cc)
@@ -240,6 +240,9 @@ if (gtest_build_tests)
 
   cxx_executable(gtest_uninitialized_test_ test gtest)
   py_test(gtest_uninitialized_test)
+
+  cxx_executable(gtest_notest_test_ test gtest)
+  py_test(gtest_notest_test)
 
   cxx_executable(gtest_xml_outfile1_test_ test gtest_main)
   cxx_executable(gtest_xml_outfile2_test_ test gtest_main)

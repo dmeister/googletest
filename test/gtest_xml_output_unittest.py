@@ -158,7 +158,7 @@ class GTestXMLOutputUnitTest(gtest_xml_test_utils.GTestXMLTestCase):
     tests that the XML output is expected.
     """
 
-    self._TestXmlOutput('gtest_no_test_unittest', EXPECTED_EMPTY_XML, 0)
+    self._TestXmlOutput('gtest_expect_before_tests_unittest', EXPECTED_EMPTY_XML, 0)
 
   def testDefaultOutputFile(self):
     """
@@ -168,7 +168,7 @@ class GTestXMLOutputUnitTest(gtest_xml_test_utils.GTestXMLTestCase):
     output_file = os.path.join(gtest_test_utils.GetTempDir(),
                                GTEST_DEFAULT_OUTPUT_FILE)
     gtest_prog_path = gtest_test_utils.GetTestExecutablePath(
-        'gtest_no_test_unittest')
+        'gtest_expect_before_tests_unittest')
     try:
       os.remove(output_file)
     except OSError, e:
