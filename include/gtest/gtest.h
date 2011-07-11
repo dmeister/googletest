@@ -406,9 +406,9 @@ class GTEST_API_ Test {
   static void RecordProperty(const char* key, const char* value);
 
   template <typename T> static void RecordProperty(const char* key, const T& value) {
-   Message value_message;
-   value_message << value;
-   RecordProperty(key, value_message.GetString().c_str());
+    std::stringstream sstr;
+    ::testing::internal::UniversalPrinter<T>::Print(value, &sstr);
+   RecordProperty(key, sstr.str().c_str());
  }
  protected:
   // Creates a Test object.
