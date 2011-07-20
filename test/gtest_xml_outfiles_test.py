@@ -43,6 +43,7 @@ import gtest_xml_test_utils
 GTEST_OUTPUT_SUBDIR = "xml_outfiles"
 GTEST_OUTPUT_1_TEST = "gtest_xml_outfile1_test_"
 GTEST_OUTPUT_2_TEST = "gtest_xml_outfile2_test_"
+GTEST_OUTPUT_3_TEST = "gtest_xml_outfile3_test_"
 
 EXPECTED_XML_1 = """<?xml version="1.0" encoding="UTF-8"?>
 <testsuites tests="3" failures="0" disabled="0" errors="0" time="*" name="AllTests">
@@ -62,6 +63,13 @@ EXPECTED_XML_2 = """<?xml version="1.0" encoding="UTF-8"?>
 </testsuites>
 """
 
+EXPECTED_XML_3 = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0" disabled="0" errors="0" time="*" name="AllTests">
+  <testsuite name="PropertyThree" tests="1" failures="0" disabled="0" errors="0" time="*">
+    <testcase name="TestXMLAttributedProperties" status="run" time="*" classname="PropertyThree" SetUpProp="3" TestXMLAttributedProperty="test&quot;test" TearDownProp="3" />
+  </testsuite>
+</testsuites>
+"""
 
 class GTestXMLOutFilesTest(gtest_xml_test_utils.GTestXMLTestCase):
   """Unit test for Google Test's XML output functionality."""
@@ -97,6 +105,9 @@ class GTestXMLOutFilesTest(gtest_xml_test_utils.GTestXMLTestCase):
   def testOutfile2(self):
     self._TestOutFile(GTEST_OUTPUT_2_TEST, EXPECTED_XML_2)
 
+  def testOutfile3(self):
+    self._TestOutFile(GTEST_OUTPUT_3_TEST, EXPECTED_XML_3)
+
   def _TestOutFile(self, test_name, expected_xml):
     gtest_prog_path = gtest_test_utils.GetTestExecutablePath(test_name)
     command = [gtest_prog_path, "--gtest_output=xml:%s" % self.output_dir_]
@@ -122,6 +133,7 @@ class GTestXMLOutFilesTest(gtest_xml_test_utils.GTestXMLTestCase):
       actual = minidom.parse(output_file1)
     else:
       actual = minidom.parse(output_file2)
+    print actual.toxml()
     self.NormalizeXml(actual.documentElement)
     self.AssertEquivalentNodes(expected.documentElement,
                                actual.documentElement)
