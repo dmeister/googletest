@@ -56,7 +56,7 @@ else:
   STACK_TRACE_TEMPLATE = ''
 
 EXPECTED_NON_EMPTY_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="23" failures="4" disabled="2" errors="0" time="*" datetime="*" name="AllTests">
+<testsuites tests="23" failures="4" disabled="2" errors="0" time="*" timestamp="*" name="AllTests">
   <testsuite name="SuccessfulTest" tests="1" failures="0" disabled="0" errors="0" time="*">
     <testcase name="Succeeds" status="run" time="*" classname="SuccessfulTest"/>
   </testsuite>
@@ -129,7 +129,7 @@ Invalid characters in brackets []%(stack)s]]></failure>
 
 
 EXPECTED_EMPTY_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="0" failures="0" disabled="0" errors="0" time="*" datetime="*" name="AllTests">
+<testsuites tests="0" failures="0" disabled="0" errors="0" time="*" timestamp="*" name="AllTests">
 </testsuites>"""
 
 GTEST_PROGRAM_PATH = gtest_test_utils.GetTestExecutablePath(GTEST_PROGRAM_NAME)
@@ -161,15 +161,15 @@ class GTestXMLOutputUnitTest(gtest_xml_test_utils.GTestXMLTestCase):
 
     self._TestXmlOutput('gtest_no_test_unittest', EXPECTED_EMPTY_XML, 0)
     
-  def testDatetimeValue(self):
+  def testTimestampValue(self):
     """
     Runs a test program that generates an empty XML output, and checks if
-    the date time value in the test suites tag is valid
+    the timestamp value in the test suites tag is valid
     """
     actual = self._GetXmlOutput("gtest_no_test_unittest", 0)
     test_suites_tag =  actual.documentElement
-    datetime_attribute = test_suites_tag.getAttributeNode("datetime")
-    xml_datetime = datetime.datetime.strptime(datetime_attribute.value, "%Y-%m-%dT%H:%M:%S")
+    timestamp_attribute = test_suites_tag.getAttributeNode("timestamp")
+    xml_datetime = datetime.datetime.strptime(timestamp_attribute.value, "%Y-%m-%dT%H:%M:%S")
     
     time_delta = xml_datetime - datetime.datetime.now()
     # date time value should be near the current local time

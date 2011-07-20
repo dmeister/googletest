@@ -151,7 +151,7 @@ class GTestXMLTestCase(gtest_test_utils.TestCase):
     *  The "time" attribute of <testsuites>, <testsuite> and <testcase>
        elements is replaced with a single asterisk, if it contains
        only digit characters.
-    *  The "datetime" attribute of <testsuites> elements is replaced with a single asterisk, if it contains
+    *  The "timestamp" attribute of <testsuites> elements is replaced with a single asterisk, if it contains
        a valid ISO8601 datetime value
     *  The "type_param" attribute of <testcase> elements is replaced with a
        single asterisk (if it sn non-empty) as it is the type name returned
@@ -163,8 +163,8 @@ class GTestXMLTestCase(gtest_test_utils.TestCase):
     """
     
     if element.tagName == "testsuites":
-        datetime = element.getAttributeNode("datetime")
-        datetime.value = re.sub(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$", "*", datetime.value)
+        timestamp = element.getAttributeNode("timestamp")
+        timestamp.value = re.sub(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$", "*", timestamp.value)
     if element.tagName in ("testsuites", "testsuite", "testcase"):
       time = element.getAttributeNode("time")
       time.value = re.sub(r"^\d+(\.\d+)?$", "*", time.value)

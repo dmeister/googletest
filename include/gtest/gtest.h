@@ -1155,7 +1155,8 @@ class GTEST_API_ UnitTest {
   // Gets the elapsed time, in milliseconds.
   TimeInMillis elapsed_time() const;
   
-  TimeInMillis start_datetime() const;
+  // Gets the timestamp recorded when the start started.
+  TimeInMillis start_timestamp() const;
 
   // Returns true iff the unit test passed (i.e. all test cases passed).
   bool Passed() const;
