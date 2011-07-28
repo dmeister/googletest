@@ -63,6 +63,7 @@
 #include "gtest/gtest_prod.h"
 #include "gtest/gtest-test-part.h"
 #include "gtest/gtest-typed-test.h"
+#include "gtest/internal/gtest-test-runner.h"
 
 // Depending on the platform, different string classes are available.
 // On Linux, in addition to ::std::string, Google also makes use of
@@ -151,12 +152,14 @@ class AssertHelper;
 class DefaultGlobalTestPartResultReporter;
 class ExecDeathTest;
 class NoExecDeathTest;
+class NoExecTestRunner;
 class FinalSuccessChecker;
 class GTestFlagSaver;
 class TestResultAccessor;
 class TestEventListenersAccessor;
 class TestEventRepeater;
 class WindowsDeathTest;
+
 class UnitTestImpl* GetUnitTestImpl();
 void ReportFailureInUnknownLocation(TestPartResult::Type result_type,
                                     const String& message);
@@ -1039,6 +1042,7 @@ class GTEST_API_ TestEventListeners {
   friend class TestInfo;
   friend class internal::DefaultGlobalTestPartResultReporter;
   friend class internal::NoExecDeathTest;
+  friend class internal::NoExecTestRunner;
   friend class internal::TestEventListenersAccessor;
   friend class internal::UnitTestImpl;
 

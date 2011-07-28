@@ -2154,20 +2154,55 @@ void Test::Run() {
 
   internal::UnitTestImpl* const impl = internal::GetUnitTestImpl();
   impl->os_stack_trace_getter()->UponLeavingGTest();
-  internal::HandleExceptionsInMethodIfSupported(this, &Test::SetUp, "SetUp()");
-  // We will run the test only if SetUp() was successful.
-  if (!HasFatalFailure()) {
-    impl->os_stack_trace_getter()->UponLeavingGTest();
-    internal::HandleExceptionsInMethodIfSupported(
-        this, &Test::TestBody, "the test body");
-  }
 
-  // However, we want to clean up as much as possible.  Hence we will
-  // always call TearDown(), even if SetUp() or the test body has
-  // failed.
-  impl->os_stack_trace_getter()->UponLeavingGTest();
-  internal::HandleExceptionsInMethodIfSupported(
-      this, &Test::TearDown, "TearDown()");
+  ::testing::internal::TestRunner* gtest_tr;
+  if (!::testing::internal::TestRunner::Create(&gtest_tr)) {
+  	// TODO (dmeister) Error handling
+  } else {
+	impl->set_current_test_runner(gtest_tr);
+	::testing::internal::scoped_ptr< ::testing::internal::TestRunner> gtest_tr_ptr(gtest_tr);
+      switch (gtest_tr->AssumeRole()) {
+        case ::testing::internal::TestRunner::OVERSEE_TEST:
+		  gtest_tr->Wait();
+		  if (!gtest_tr->ProcessOutcome()) {
+			// TODO (dmeister) Error handling
+		  }
+          break;
+        case ::testing::internal::TestRunner::EXECUTE_TEST: {
+			gtest_tr->SetUp();
+	
+			// replace test part result reporter by test runner enabled variant
+			::testing::internal::TestRunnerTestPartResultReporter test_runner_reporter(gtest_tr);
+			TestPartResultReporterInterface* old_reporter = impl->GetGlobalTestPartResultReporter();
+			impl->SetGlobalTestPartResultReporter(&test_runner_reporter);
+	
+			  internal::HandleExceptionsInMethodIfSupported(this, &Test::SetUp, "SetUp()");
+			  // We will run the test only if SetUp() was successful.
+			  if (!HasFatalFailure()) {
+			    impl->os_stack_trace_getter()->UponLeavingGTest();
+			    internal::HandleExceptionsInMethodIfSupported(
+			        this, &Test::TestBody, "the test body");
+			  }
+
+			  // However, we want to clean up as much as possible.  Hence we will
+			  // always call TearDown(), even if SetUp() or the test body has
+			  // failed.
+			  impl->os_stack_trace_getter()->UponLeavingGTest();
+			  internal::HandleExceptionsInMethodIfSupported(
+			      this, &Test::TearDown, "TearDown()");
+	
+			  impl->SetGlobalTestPartResultReporter(old_reporter);
+			  }	
+			
+			gtest_tr->TearDown();
+          break;
+		default:
+			// TODO (dmeister) Should not happen
+		break;
+        }
+
+		impl->set_current_test_runner(NULL);
+	} 
 }
 
 // Returns true iff the current test has a fatal failure.
@@ -3969,6 +4004,8 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
 #if GTEST_HAS_DEATH_TEST
       internal_run_death_test_flag_(NULL),
       death_test_factory_(new DefaultDeathTestFactory),
+	  test_runner_factory_(new DefaultTestRunnerFactory),
+	  current_test_runner_(NULL),
 #endif
       // Will be overridden by the flag before first use.
       catch_exceptions_(false) {
