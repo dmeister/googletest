@@ -75,6 +75,8 @@ namespace testing {
 GTEST_DECLARE_bool_(death_test_use_fork);
 
 namespace internal {
+	
+class TestRunner;
 
 // The value of GetTestTypeId() as seen from within the Google Test
 // library.  This is solely for testing GetTestTypeId().
@@ -189,6 +191,8 @@ class GTestFlagSaver {
     GTEST_FLAG(stack_trace_depth) = stack_trace_depth_;
     GTEST_FLAG(stream_result_to) = stream_result_to_;
     GTEST_FLAG(throw_on_failure) = throw_on_failure_;
+
+	// TODO (dmeister) show_internal_stack_frames is not handeled
   }
  private:
   // Fields for saving the original values of flags.
@@ -745,6 +749,21 @@ class GTEST_API_ UnitTestImpl {
     return death_test_factory_.get();
   }
 
+  internal::TestRunnerFactory* test_runner_factory() {
+	  return test_runner_factory_.get();	
+  }
+
+  internal::TestRunner* current_test_runner() {
+	  return current_test_runner_;
+  }
+
+  // Sets the current test runner.
+  // Only allowed in main thread.
+  // Doesn't hand over ownership.
+  void set_current_test_runner(TestRunner* test_runner) {
+	  current_test_runner_ = test_runner;
+  }
+
   void SuppressTestEventsIfInSubprocess();
 
   friend class ReplaceDeathTestFactory;
@@ -890,6 +909,9 @@ class GTEST_API_ UnitTestImpl {
   internal::scoped_ptr<internal::DeathTestFactory> death_test_factory_;
 #endif  // GTEST_HAS_DEATH_TEST
 
+  internal::scoped_ptr<internal::TestRunnerFactory> test_runner_factory_;
+  internal::TestRunner* current_test_runner_;
+
   // A per-thread stack of traces created by the SCOPED_TRACE() macro.
   internal::ThreadLocal<std::vector<TraceInfo> > gtest_trace_stack_;
 
@@ -1022,7 +1044,7 @@ class TestResultAccessor {
     test_result->RecordProperty(property);
   }
 
-  static void ClearTestPartResults(TestResult* test_result) {
+  static void ClearTestPartResults(TestResult* test_result) {      
     test_result->ClearTestPartResults();
   }
 

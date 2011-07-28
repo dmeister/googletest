@@ -115,7 +115,6 @@ if (gtest_build_tests)
   cxx_test(gtest_environment_test gtest)
   cxx_test(gtest-filepath_test gtest_main)
   cxx_test(gtest-linked_ptr_test gtest_main)
-  cxx_test(gtest-listener_test gtest_main)
   cxx_test(gtest_main_unittest gtest_main)
   cxx_test(gtest-message_test gtest_main)
   cxx_test(gtest_no_test_unittest gtest)
@@ -223,11 +222,17 @@ if (gtest_build_tests)
   cxx_executable(gtest_list_tests_unittest_ test gtest)
   py_test(gtest_list_tests_unittest)
 
+  cxx_executable(gtest_listener_test_ test gtest)
+  py_test(gtest_listener_test)
+
   cxx_executable(gtest_output_test_ test gtest)
   py_test(gtest_output_test)
 
   cxx_executable(gtest_shuffle_test_ test gtest)
   py_test(gtest_shuffle_test)
+
+  cxx_executable(gtest_crash_safe_test_ test gtest)
+  py_test(gtest_crash_safe_test)
 
   # MSVC 7.1 does not support STL with exceptions disabled.
   if (NOT MSVC OR MSVC_VERSION GREATER 1310)

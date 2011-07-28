@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <list>
 
 #if GTEST_OS_WINDOWS_MOBILE
 # include <windows.h>  // For TerminateProcess()
@@ -514,7 +515,6 @@ class CapturedStream {
  public:
   // The ctor redirects the stream to a temporary file.
   CapturedStream(int fd) : fd_(fd), uncaptured_fd_(dup(fd)) {
-
 # if GTEST_OS_WINDOWS
     char temp_dir_path[MAX_PATH + 1] = { '\0' };  // NOLINT
     char temp_file_path[MAX_PATH + 1] = { '\0' };  // NOLINT
@@ -536,6 +536,7 @@ class CapturedStream {
     // directory instead.
     char name_template[] = "/tmp/captured_stream.XXXXXX";
     const int captured_fd = mkstemp(name_template);
+    GTEST_CHECK_(captured_fd != -1) << "Unable to open temporary file";
     filename_ = name_template;
 # endif  // GTEST_OS_WINDOWS
     fflush(NULL);
@@ -610,43 +611,46 @@ String CapturedStream::ReadEntireFile(FILE* file) {
 #  pragma warning(pop)
 # endif  // _MSC_VER
 
-static CapturedStream* g_captured_stderr = NULL;
-static CapturedStream* g_captured_stdout = NULL;
+static std::list<CapturedStream*> g_captured_stderr_stack;
+static std::list<CapturedStream*> g_captured_stdout_stack;
 
 // Starts capturing an output stream (stdout/stderr).
-void CaptureStream(int fd, const char* stream_name, CapturedStream** stream) {
-  if (*stream != NULL) {
-    GTEST_LOG_(FATAL) << "Only one " << stream_name
-                      << " capturer can exist at a time.";
-  }
-  *stream = new CapturedStream(fd);
+void CaptureStream(int fd, std::list<CapturedStream*>* stream_stack) {
+  CapturedStream* stream = new CapturedStream(fd);
+  stream_stack->push_back(stream);
 }
 
 // Stops capturing the output stream and returns the captured string.
-String GetCapturedStream(CapturedStream** captured_stream) {
-  const String content = (*captured_stream)->GetCapturedString();
+String GetCapturedStream(std::list<CapturedStream*>* stream_stack) {
+  GTEST_CHECK_(!stream_stack->empty());
+  
+  // TODO (dmeister): Inefficient, but I am offline and the API not in mind.
+  std::list<CapturedStream*>::iterator i = --(stream_stack->end());
+  CapturedStream* captured_stream = *i;
+  stream_stack->erase(i);
+  const String content = captured_stream->GetCapturedString();
 
-  delete *captured_stream;
-  *captured_stream = NULL;
+  delete captured_stream;
+  captured_stream = NULL;
 
   return content;
 }
 
 // Starts capturing stdout.
 void CaptureStdout() {
-  CaptureStream(kStdOutFileno, "stdout", &g_captured_stdout);
+  CaptureStream(kStdOutFileno, &g_captured_stdout_stack);
 }
 
 // Starts capturing stderr.
 void CaptureStderr() {
-  CaptureStream(kStdErrFileno, "stderr", &g_captured_stderr);
+  CaptureStream(kStdErrFileno, &g_captured_stderr_stack);
 }
 
 // Stops capturing stdout and returns the captured string.
-String GetCapturedStdout() { return GetCapturedStream(&g_captured_stdout); }
+String GetCapturedStdout() { return GetCapturedStream(&g_captured_stdout_stack); }
 
 // Stops capturing stderr and returns the captured string.
-String GetCapturedStderr() { return GetCapturedStream(&g_captured_stderr); }
+String GetCapturedStderr() { return GetCapturedStream(&g_captured_stderr_stack); }
 
 #endif  // GTEST_HAS_STREAM_REDIRECTION
 

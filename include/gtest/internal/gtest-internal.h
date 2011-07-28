@@ -120,6 +120,7 @@ struct TraceInfo;                      // Information about a trace point.
 class ScopedTrace;                     // Implements scoped trace.
 class TestInfoImpl;                    // Opaque implementation of TestInfo
 class UnitTestImpl;                    // Opaque implementation of UnitTest
+class TestRunnerTestPartResultReporter; // Test runner helper implementation
 
 // How many times InitGoogleTest() has been called.
 GTEST_API_ extern int g_init_gtest_count;

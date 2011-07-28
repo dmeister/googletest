@@ -1056,6 +1056,8 @@ DeathTest::TestRole ExecDeathTest::AssumeRole() {
       String::Format("--%s%s=%s.%s",
                      GTEST_FLAG_PREFIX_, kFilterFlag,
                      info->test_case_name(), info->name());
+  const String crash_safe_flag =
+    String::Format("--%s%s=false", GTEST_FLAG_PREFIX_, kCrashSafeFlag);
   const String internal_flag =
       String::Format("--%s%s=%s|%d|%d|%d",
                      GTEST_FLAG_PREFIX_, kInternalRunDeathTestFlag,
@@ -1064,7 +1066,8 @@ DeathTest::TestRole ExecDeathTest::AssumeRole() {
   args.AddArguments(GetArgvs());
   args.AddArgument(filter_flag.c_str());
   args.AddArgument(internal_flag.c_str());
-
+  args.AddArgument(crash_safe_flag.c_str());
+  
   DeathTest::set_last_death_test_message("");
 
   CaptureStderr();

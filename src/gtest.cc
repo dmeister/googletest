@@ -661,7 +661,7 @@ DefaultGlobalTestPartResultReporter::DefaultGlobalTestPartResultReporter(
     UnitTestImpl* unit_test) : unit_test_(unit_test) {}
 
 void DefaultGlobalTestPartResultReporter::ReportTestPartResult(
-    const TestPartResult& result) {
+    const TestPartResult& result) {    
   unit_test_->current_test_result()->AddTestPartResult(result);
   unit_test_->listeners()->repeater()->OnTestPartResult(result);
 }
@@ -1875,7 +1875,7 @@ static bool TestPartNonfatallyFailed(const TestPartResult& result) {
 
 // Returns true iff the test has a non-fatal failure.
 bool TestResult::HasNonfatalFailure() const {
-  return CountIf(test_part_results_, TestPartNonfatallyFailed) > 0;
+    return CountIf(test_part_results_, TestPartNonfatallyFailed) > 0;
 }
 
 // Gets the number of all test parts.  This is the sum of the number
@@ -2154,20 +2154,57 @@ void Test::Run() {
 
   internal::UnitTestImpl* const impl = internal::GetUnitTestImpl();
   impl->os_stack_trace_getter()->UponLeavingGTest();
-  internal::HandleExceptionsInMethodIfSupported(this, &Test::SetUp, "SetUp()");
-  // We will run the test only if SetUp() was successful.
-  if (!HasFatalFailure()) {
-    impl->os_stack_trace_getter()->UponLeavingGTest();
-    internal::HandleExceptionsInMethodIfSupported(
-        this, &Test::TestBody, "the test body");
-  }
 
-  // However, we want to clean up as much as possible.  Hence we will
-  // always call TearDown(), even if SetUp() or the test body has
-  // failed.
-  impl->os_stack_trace_getter()->UponLeavingGTest();
-  internal::HandleExceptionsInMethodIfSupported(
-      this, &Test::TearDown, "TearDown()");
+  ::testing::internal::TestRunner* gtest_tr;
+  if (!::testing::internal::TestRunner::Create(&gtest_tr)) {
+  	// TODO (dmeister) Error handling
+    GTEST_LOG_(FATAL) << "Failed to create test runner";
+  } else {
+	  ::testing::internal::scoped_ptr< ::testing::internal::TestRunner> gtest_tr_ptr(gtest_tr);
+    switch (gtest_tr->AssumeRole()) {
+      case ::testing::internal::TestRunner::OVERSEE_TEST:
+		    gtest_tr->Wait();
+		    if (!gtest_tr->ProcessOutcome()) {
+			    // TODO (dmeister) Error handling
+		    }
+        break;
+      case ::testing::internal::TestRunner::EXECUTE_TEST: {
+        impl->set_current_test_runner(gtest_tr);
+			  gtest_tr->SetUp();
+	
+			  // replace test part result reporter by test runner enabled variant
+			  TestPartResultReporterInterface* old_reporter = impl->GetGlobalTestPartResultReporter();
+			  ::testing::internal::TestRunnerTestPartResultReporter test_runner_reporter(
+				  old_reporter, gtest_tr);
+
+			  impl->SetGlobalTestPartResultReporter(&test_runner_reporter);
+	
+			  internal::HandleExceptionsInMethodIfSupported(this, &Test::SetUp, "SetUp()");
+			  // We will run the test only if SetUp() was successful.
+			  if (!HasFatalFailure()) {
+			    impl->os_stack_trace_getter()->UponLeavingGTest();
+
+			    internal::HandleExceptionsInMethodIfSupported(
+			        this, &Test::TestBody, "the test body");
+			  }
+			  // However, we want to clean up as much as possible.  Hence we will
+			  // always call TearDown(), even if SetUp() or the test body has
+			  // failed.
+			  impl->os_stack_trace_getter()->UponLeavingGTest();
+			
+			  internal::HandleExceptionsInMethodIfSupported(
+			      this, &Test::TearDown, "TearDown()");
+	
+			  impl->SetGlobalTestPartResultReporter(old_reporter);
+			  gtest_tr->TearDown();
+		    impl->set_current_test_runner(NULL);
+			}			
+      break;
+		default:
+			// TODO (dmeister) Should not happen
+		  break;
+    }
+	} 
 }
 
 // Returns true iff the current test has a fatal failure.
@@ -3811,6 +3848,10 @@ void UnitTest::AddTestPartResult(TestPartResult::Type result_type,
 void UnitTest::RecordPropertyForCurrentTest(const char* key,
                                             const char* value) {
   const TestProperty test_property(key, value);
+  
+  if (impl_->current_test_runner()) {
+    impl_->current_test_runner()->RecordProperty(key, value);
+  }
   impl_->current_test_result()->RecordProperty(test_property);
 }
 
@@ -3969,6 +4010,8 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
 #if GTEST_HAS_DEATH_TEST
       internal_run_death_test_flag_(NULL),
       death_test_factory_(new DefaultDeathTestFactory),
+	  test_runner_factory_(new DefaultTestRunnerFactory),
+	  current_test_runner_(NULL),
 #endif
       // Will be overridden by the flag before first use.
       catch_exceptions_(false) {
@@ -4725,6 +4768,11 @@ static const char kColorEncodedHelpMessage[] =
 "  @G--" GTEST_FLAG_PREFIX_ "random_seed=@Y[NUMBER]@D\n"
 "      Random number seed to use for shuffling test orders (between 1 and\n"
 "      99999, or 0 to use a seed based on the current time).\n"
+#if GTEST_HAS_CRASH_SAFE_TEST_RUNNER
+"  @G--" GTEST_FLAG_PREFIX_ "crash_safe=@Ytrue@D\n"
+"      Executes all test in isolated subprocessed. If a test crashes or otherwise"
+"       exits the test process, the testing is continued with the next text (on OS X, Linux)\n"
+#endif
 "\n"
 "Test Output:\n"
 "  @G--" GTEST_FLAG_PREFIX_ "color=@Y(@Gyes@Y|@Gno@Y|@Gauto@Y)@D\n"
@@ -4804,7 +4852,9 @@ void ParseGoogleTestFlagsOnlyImpl(int* argc, CharType** argv) {
         ParseStringFlag(arg, kStreamResultToFlag,
                         &GTEST_FLAG(stream_result_to)) ||
         ParseBoolFlag(arg, kThrowOnFailureFlag,
-                      &GTEST_FLAG(throw_on_failure))
+                      &GTEST_FLAG(throw_on_failure)) ||
+        ParseBoolFlag(arg, kCrashSafeFlag,
+                      &GTEST_FLAG(crash_safe))
         ) {
       // Yes.  Shift the remainder of the argv list left by one.  Note
       // that argv has (*argc + 1) elements, the last one always being

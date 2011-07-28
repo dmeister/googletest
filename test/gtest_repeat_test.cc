@@ -43,6 +43,13 @@
 #define GTEST_IMPLEMENTATION_ 1
 #include "src/gtest-internal-inl.h"
 #undef GTEST_IMPLEMENTATION_
+# include "gtest/internal/gtest-port.h"
+# include "gtest/internal/gtest-internal.h"
+
+// file opened at start
+// contains information produced by test cases (that may run in subprocesses) and
+// verified after all test are finished.
+static FILE* log_file = NULL;
 
 namespace testing {
 
@@ -77,40 +84,35 @@ namespace {
 // Used for verifying that global environment set-up and tear-down are
 // inside the gtest_repeat loop.
 
-int g_environment_set_up_count = 0;
-int g_environment_tear_down_count = 0;
-
 class MyEnvironment : public testing::Environment {
  public:
   MyEnvironment() {}
-  virtual void SetUp() { g_environment_set_up_count++; }
-  virtual void TearDown() { g_environment_tear_down_count++; }
+  virtual void SetUp() { 
+  fprintf(log_file, "environment_set_up_count\n");
+  }
+  virtual void TearDown() { 
+    fprintf(log_file, "environment_tear_down_count\n");
+  }
 };
 
 // A test that should fail.
 
-int g_should_fail_count = 0;
-
 TEST(FooTest, ShouldFail) {
-  g_should_fail_count++;
+  fprintf(log_file, "should_fail_count\n");
   EXPECT_EQ(0, 1) << "Expected failure.";
 }
 
 // A test that should pass.
 
-int g_should_pass_count = 0;
-
 TEST(FooTest, ShouldPass) {
-  g_should_pass_count++;
+  fprintf(log_file, "should_pass_count\n");
 }
 
 // A test that contains a thread-safe death test and a fast death
 // test.  It should pass.
 
-int g_death_test_count = 0;
-
 TEST(BarDeathTest, ThreadSafeAndFast) {
-  g_death_test_count++;
+  fprintf(log_file, "death_test_count\n");
 
   GTEST_FLAG(death_test_style) = "threadsafe";
   EXPECT_DEATH_IF_SUPPORTED(::testing::internal::posix::Abort(), "");
@@ -120,7 +122,6 @@ TEST(BarDeathTest, ThreadSafeAndFast) {
 }
 
 #if GTEST_HAS_PARAM_TEST
-int g_param_test_count = 0;
 
 const int kNumberOfParamTests = 10;
 
@@ -129,8 +130,7 @@ class MyParamTest : public testing::TestWithParam<int> {};
 TEST_P(MyParamTest, ShouldPass) {
   // TODO(vladl@google.com): Make parameter value checking robust
   //                         WRT order of tests.
-  GTEST_CHECK_INT_EQ_(g_param_test_count % kNumberOfParamTests, GetParam());
-  g_param_test_count++;
+  fprintf(log_file, "param_test_count\n");
 }
 INSTANTIATE_TEST_CASE_P(MyParamSequence,
                         MyParamTest,
@@ -139,26 +139,66 @@ INSTANTIATE_TEST_CASE_P(MyParamSequence,
 
 // Resets the count for each test.
 void ResetCounts() {
-  g_environment_set_up_count = 0;
-  g_environment_tear_down_count = 0;
-  g_should_fail_count = 0;
-  g_should_pass_count = 0;
-  g_death_test_count = 0;
-#if GTEST_HAS_PARAM_TEST
-  g_param_test_count = 0;
-#endif  // GTEST_HAS_PARAM_TEST
+  GTEST_CHECK_(log_file == NULL);
+  
+  char name_template[] = "/tmp/gtest_log.XXXXXX";
+  int log_fd = mkstemp(name_template);
+  log_file = testing::internal::posix::FDOpen(log_fd, "w+");
+}
+
+testing::internal::String ReadEntireFile(FILE* file) {    
+  fseek(file, 0, SEEK_END);
+  const size_t file_size = static_cast<size_t>(ftell(file));
+  
+  char* const buffer = new char[file_size];
+
+  size_t bytes_last_read = 0;  // # of bytes read in the last fread()
+  size_t bytes_read = 0;       // # of bytes read so far
+
+  fseek(file, 0, SEEK_SET);
+
+  // Keeps reading the file until we cannot read further or the
+  // pre-determined file size is reached.
+  do {
+    bytes_last_read = fread(buffer+bytes_read, 1, file_size-bytes_read, file);
+    bytes_read += bytes_last_read;
+  } while (bytes_last_read > 0 && bytes_read < file_size);
+
+  const testing::internal::String content(buffer, bytes_read);
+  delete[] buffer;
+  return content;
+}
+
+int CountOccurences(const char* contents, const char* pattern) {
+  int occurences = 0;
+  const char* pos = strstr(contents, pattern);
+  while (pos != NULL) {
+    occurences++;
+    pos = strstr(pos + strlen(pattern), pattern);
+  }
+  return occurences;
 }
 
 // Checks that the count for each test is expected.
 void CheckCounts(int expected) {
-  GTEST_CHECK_INT_EQ_(expected, g_environment_set_up_count);
-  GTEST_CHECK_INT_EQ_(expected, g_environment_tear_down_count);
-  GTEST_CHECK_INT_EQ_(expected, g_should_fail_count);
-  GTEST_CHECK_INT_EQ_(expected, g_should_pass_count);
-  GTEST_CHECK_INT_EQ_(expected, g_death_test_count);
+  testing::internal::String contents = ReadEntireFile(log_file);    
+  GTEST_CHECK_INT_EQ_(expected, 
+    CountOccurences(contents.c_str(), "environment_set_up_count"));
+  GTEST_CHECK_INT_EQ_(expected, 
+    CountOccurences(contents.c_str(), "environment_tear_down_count"));
+  GTEST_CHECK_INT_EQ_(expected, 
+    CountOccurences(contents.c_str(), "should_fail_count"));
+  GTEST_CHECK_INT_EQ_(expected, 
+    CountOccurences(contents.c_str(), "should_pass_count"));
+  GTEST_CHECK_INT_EQ_(expected, 
+    CountOccurences(contents.c_str(), "death_test_count"));
 #if GTEST_HAS_PARAM_TEST
-  GTEST_CHECK_INT_EQ_(expected * kNumberOfParamTests, g_param_test_count);
+  GTEST_CHECK_INT_EQ_(expected * kNumberOfParamTests, 
+    CountOccurences(contents.c_str(), "param_test_count"));
 #endif  // GTEST_HAS_PARAM_TEST
+
+  testing::internal::posix::FClose(log_file);
+  log_file = NULL;
 }
 
 // Tests the behavior of Google Test when --gtest_repeat is not specified.
@@ -196,14 +236,24 @@ void TestRepeatWithFilterForSuccessfulTests(int repeat) {
 
   ResetCounts();
   GTEST_CHECK_INT_EQ_(0, RUN_ALL_TESTS());
-  GTEST_CHECK_INT_EQ_(repeat, g_environment_set_up_count);
-  GTEST_CHECK_INT_EQ_(repeat, g_environment_tear_down_count);
-  GTEST_CHECK_INT_EQ_(0, g_should_fail_count);
-  GTEST_CHECK_INT_EQ_(repeat, g_should_pass_count);
-  GTEST_CHECK_INT_EQ_(repeat, g_death_test_count);
+  
+  testing::internal::String contents = ReadEntireFile(log_file);   
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "environment_set_up_count"));
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "environment_tear_down_count"));
+   GTEST_CHECK_INT_EQ_(0, 
+     CountOccurences(contents.c_str(), "should_fail_count"));
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "should_pass_count"));
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "death_test_count"));
 #if GTEST_HAS_PARAM_TEST
-  GTEST_CHECK_INT_EQ_(repeat * kNumberOfParamTests, g_param_test_count);
+   GTEST_CHECK_INT_EQ_(repeat * kNumberOfParamTests, 
+     CountOccurences(contents.c_str(), "param_test_count"));
 #endif  // GTEST_HAS_PARAM_TEST
+  testing::internal::posix::FClose(log_file);
+  log_file = NULL;
 }
 
 // Tests using --gtest_repeat when --gtest_filter specifies a set of
@@ -214,14 +264,24 @@ void TestRepeatWithFilterForFailedTests(int repeat) {
 
   ResetCounts();
   GTEST_CHECK_INT_EQ_(1, RUN_ALL_TESTS());
-  GTEST_CHECK_INT_EQ_(repeat, g_environment_set_up_count);
-  GTEST_CHECK_INT_EQ_(repeat, g_environment_tear_down_count);
-  GTEST_CHECK_INT_EQ_(repeat, g_should_fail_count);
-  GTEST_CHECK_INT_EQ_(0, g_should_pass_count);
-  GTEST_CHECK_INT_EQ_(0, g_death_test_count);
+  
+  testing::internal::String contents = ReadEntireFile(log_file);   
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "environment_set_up_count"));
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "environment_tear_down_count"));
+   GTEST_CHECK_INT_EQ_(repeat, 
+     CountOccurences(contents.c_str(), "should_fail_count"));
+   GTEST_CHECK_INT_EQ_(0, 
+     CountOccurences(contents.c_str(), "should_pass_count"));
+   GTEST_CHECK_INT_EQ_(0, 
+     CountOccurences(contents.c_str(), "death_test_count"));
 #if GTEST_HAS_PARAM_TEST
-  GTEST_CHECK_INT_EQ_(0, g_param_test_count);
+   GTEST_CHECK_INT_EQ_(0, 
+     CountOccurences(contents.c_str(), "param_test_count"));
 #endif  // GTEST_HAS_PARAM_TEST
+   testing::internal::posix::FClose(log_file);
+   log_file = NULL;
 }
 
 }  // namespace

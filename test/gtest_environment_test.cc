@@ -102,13 +102,9 @@ class MyEnvironment : public testing::Environment {
   bool tear_down_was_run_;
 };
 
-// Was the TEST run?
-bool test_was_run;
-
 // The sole purpose of this TEST is to enable us to check whether it
 // was run.
 TEST(FooTest, Bar) {
-  test_was_run = true;
 }
 
 // Prints the message and aborts the program if condition is false.
@@ -126,7 +122,6 @@ void Check(bool condition, const char* msg) {
 int RunAllTests(MyEnvironment* env, FailureType failure) {
   env->Reset();
   env->set_failure_in_set_up(failure);
-  test_was_run = false;
   testing::internal::GetUnitTestImpl()->ClearAdHocTestResult();
   return RUN_ALL_TESTS();
 }
@@ -147,7 +142,8 @@ int main(int argc, char **argv) {
   Check(RunAllTests(env, NO_FAILURE) != 0,
         "RUN_ALL_TESTS() should return non-zero, as the global tear-down "
         "should generate a failure.");
-  Check(test_was_run,
+
+  Check(testing::UnitTest::GetInstance()->successful_test_case_count(),
         "The tests should run, as the global set-up should generate no "
         "failure");
   Check(env->tear_down_was_run(),
@@ -158,9 +154,9 @@ int main(int argc, char **argv) {
   Check(RunAllTests(env, NON_FATAL_FAILURE) != 0,
         "RUN_ALL_TESTS() should return non-zero, as both the global set-up "
         "and the global tear-down should generate a non-fatal failure.");
-  Check(test_was_run,
+  Check(testing::UnitTest::GetInstance()->successful_test_case_count(),
         "The tests should run, as the global set-up should generate no "
-        "fatal failure.");
+        "failure");
   Check(env->tear_down_was_run(),
         "The global tear-down should run, as the global set-up was run.");
 
@@ -169,9 +165,9 @@ int main(int argc, char **argv) {
   Check(RunAllTests(env, FATAL_FAILURE) != 0,
         "RUN_ALL_TESTS() should return non-zero, as the global set-up "
         "should generate a fatal failure.");
-  Check(!test_was_run,
-        "The tests should not run, as the global set-up should generate "
-        "a fatal failure.");
+  Check(testing::UnitTest::GetInstance()->successful_test_case_count(),
+        "The tests should run, as the global set-up should generate no "
+        "failure");
   Check(env->tear_down_was_run(),
         "The global tear-down should run, as the global set-up was run.");
 

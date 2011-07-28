@@ -927,14 +927,14 @@ TEST(CaptureTest, CapturesStdoutAndStderr) {
   EXPECT_STREQ("stu", GetCapturedStderr().c_str());
 }
 
-TEST(CaptureDeathTest, CannotReenterStdoutCapture) {
+TEST(CaptureDeathTest, CanReenterStdoutCapture) {
   CaptureStdout();
-  EXPECT_DEATH_IF_SUPPORTED(CaptureStdout();,
-                            "Only one stdout capturer can exist at a time");
-  GetCapturedStdout();
-
-  // We cannot test stderr capturing using death tests as they use it
-  // themselves.
+  fprintf(stdout, "abc");
+  CaptureStdout();
+  fprintf(stdout, "def");
+  
+  EXPECT_STREQ("def", GetCapturedStdout().c_str());
+  EXPECT_STREQ("abc", GetCapturedStdout().c_str());
 }
 
 #endif  // !GTEST_OS_WINDOWS_MOBILE
