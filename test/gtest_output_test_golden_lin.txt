@@ -33,41 +33,40 @@ BarEnvironment::SetUp() called.
 [0;32m[       OK ] [mPassingTest.PassingTest2
 [0;32m[----------] [m3 tests from FatalFailureTest
 [0;32m[ RUN      ] [mFatalFailureTest.FatalFailureInSubroutine
-(expecting a failure that x should be 1)
 gtest_output_test_.cc:#: Failure
 Value of: x
   Actual: 2
 Expected: 1
+(expecting a failure that x should be 1)
 [0;31m[  FAILED  ] [mFatalFailureTest.FatalFailureInSubroutine
 [0;32m[ RUN      ] [mFatalFailureTest.FatalFailureInNestedSubroutine
-(expecting a failure that x should be 1)
 gtest_output_test_.cc:#: Failure
 Value of: x
   Actual: 2
 Expected: 1
+(expecting a failure that x should be 1)
 [0;31m[  FAILED  ] [mFatalFailureTest.FatalFailureInNestedSubroutine
 [0;32m[ RUN      ] [mFatalFailureTest.NonfatalFailureInSubroutine
-(expecting a failure on false)
 gtest_output_test_.cc:#: Failure
 Value of: false
   Actual: false
 Expected: true
+(expecting a failure on false)
 [0;31m[  FAILED  ] [mFatalFailureTest.NonfatalFailureInSubroutine
 [0;32m[----------] [m1 test from LoggingTest
 [0;32m[ RUN      ] [mLoggingTest.InterleavingLoggingAndAssertions
+gtest_output_test_.cc:#: Failure
+Expected: (3) >= (a[i]), actual: 3 vs 9
+gtest_output_test_.cc:#: Failure
+Expected: (3) >= (a[i]), actual: 3 vs 6
 (expecting 2 failures on (3) >= (a[i]))
 i == 0
 i == 1
-gtest_output_test_.cc:#: Failure
-Expected: (3) >= (a[i]), actual: 3 vs 9
 i == 2
 i == 3
-gtest_output_test_.cc:#: Failure
-Expected: (3) >= (a[i]), actual: 3 vs 6
 [0;31m[  FAILED  ] [mLoggingTest.InterleavingLoggingAndAssertions
 [0;32m[----------] [m6 tests from SCOPED_TRACETest
 [0;32m[ RUN      ] [mSCOPED_TRACETest.ObeysScopes
-(expected to fail)
 gtest_output_test_.cc:#: Failure
 Failed
 This failure is expected, and shouldn't have a trace.
@@ -79,9 +78,9 @@ gtest_output_test_.cc:#: Expected trace
 gtest_output_test_.cc:#: Failure
 Failed
 This failure is expected, and shouldn't have a trace.
+(expected to fail)
 [0;31m[  FAILED  ] [mSCOPED_TRACETest.ObeysScopes
 [0;32m[ RUN      ] [mSCOPED_TRACETest.WorksInLoop
-(expected to fail)
 gtest_output_test_.cc:#: Failure
 Value of: n
   Actual: 1
@@ -94,9 +93,9 @@ Value of: n
 Expected: 1
 Google Test trace:
 gtest_output_test_.cc:#: i = 2
+(expected to fail)
 [0;31m[  FAILED  ] [mSCOPED_TRACETest.WorksInLoop
 [0;32m[ RUN      ] [mSCOPED_TRACETest.WorksInSubroutine
-(expected to fail)
 gtest_output_test_.cc:#: Failure
 Value of: n
   Actual: 1
@@ -109,9 +108,9 @@ Value of: n
 Expected: 1
 Google Test trace:
 gtest_output_test_.cc:#: n = 2
+(expected to fail)
 [0;31m[  FAILED  ] [mSCOPED_TRACETest.WorksInSubroutine
 [0;32m[ RUN      ] [mSCOPED_TRACETest.CanBeNested
-(expected to fail)
 gtest_output_test_.cc:#: Failure
 Value of: n
   Actual: 2
@@ -119,9 +118,9 @@ Expected: 1
 Google Test trace:
 gtest_output_test_.cc:#: n = 2
 gtest_output_test_.cc:#: 
+(expected to fail)
 [0;31m[  FAILED  ] [mSCOPED_TRACETest.CanBeNested
 [0;32m[ RUN      ] [mSCOPED_TRACETest.CanBeRepeated
-(expected to fail)
 gtest_output_test_.cc:#: Failure
 Failed
 This failure is expected, and should contain trace point A.
@@ -147,9 +146,9 @@ Google Test trace:
 gtest_output_test_.cc:#: D
 gtest_output_test_.cc:#: B
 gtest_output_test_.cc:#: A
+(expected to fail)
 [0;31m[  FAILED  ] [mSCOPED_TRACETest.CanBeRepeated
 [0;32m[ RUN      ] [mSCOPED_TRACETest.WorksConcurrently
-(expecting 6 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #1 (in thread B, only trace B alive).
@@ -176,6 +175,7 @@ gtest_output_test_.cc:#: Trace A
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #6 (in thread A, no trace alive).
+(expecting 6 failures)
 [0;31m[  FAILED  ] [mSCOPED_TRACETest.WorksConcurrently
 [0;32m[----------] [m1 test from NonFatalFailureInFixtureConstructorTest
 [0;32m[ RUN      ] [mNonFatalFailureInFixtureConstructorTest.FailureInConstructor
@@ -208,7 +208,6 @@ Expected failure #2, in the test fixture d'tor.
 [0;31m[  FAILED  ] [mFatalFailureInFixtureConstructorTest.FailureInConstructor
 [0;32m[----------] [m1 test from NonFatalFailureInSetUpTest
 [0;32m[ RUN      ] [mNonFatalFailureInSetUpTest.FailureInSetUp
-(expecting 4 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #1, in SetUp().
@@ -218,19 +217,20 @@ Expected failure #2, in the test function.
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #3, in TearDown().
+(expecting 4 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #4, in the test fixture d'tor.
 [0;31m[  FAILED  ] [mNonFatalFailureInSetUpTest.FailureInSetUp
 [0;32m[----------] [m1 test from FatalFailureInSetUpTest
 [0;32m[ RUN      ] [mFatalFailureInSetUpTest.FailureInSetUp
-(expecting 3 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #1, in SetUp().
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #2, in TearDown().
+(expecting 3 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected failure #3, in the test fixture d'tor.
@@ -318,13 +318,12 @@ case.
 [0;32m[ RUN      ] [mExpectNonfatalFailureTest.SucceedsWhenThereIsOneNonfatalFailure
 [0;32m[       OK ] [mExpectNonfatalFailureTest.SucceedsWhenThereIsOneNonfatalFailure
 [0;32m[ RUN      ] [mExpectNonfatalFailureTest.FailsWhenThereIsNoNonfatalFailure
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual: 0 failures
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectNonfatalFailureTest.FailsWhenThereIsNoNonfatalFailure
 [0;32m[ RUN      ] [mExpectNonfatalFailureTest.FailsWhenThereAreTwoNonfatalFailures
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual: 2 failures
@@ -336,9 +335,9 @@ gtest_output_test_.cc:#: Non-fatal failure:
 Failed
 Expected non-fatal failure 2.
 
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectNonfatalFailureTest.FailsWhenThereAreTwoNonfatalFailures
 [0;32m[ RUN      ] [mExpectNonfatalFailureTest.FailsWhenThereIsOneFatalFailure
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual:
@@ -346,18 +345,19 @@ gtest_output_test_.cc:#: Fatal failure:
 Failed
 Expected fatal failure.
 
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectNonfatalFailureTest.FailsWhenThereIsOneFatalFailure
 [0;32m[ RUN      ] [mExpectNonfatalFailureTest.FailsWhenStatementReturns
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual: 0 failures
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectNonfatalFailureTest.FailsWhenStatementReturns
 [0;32m[ RUN      ] [mExpectNonfatalFailureTest.FailsWhenStatementThrows
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual: 0 failures
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectNonfatalFailureTest.FailsWhenStatementThrows
 [0;32m[----------] [m8 tests from ExpectFatalFailureTest
 [0;32m[ RUN      ] [mExpectFatalFailureTest.CanReferenceGlobalVariables
@@ -367,13 +367,12 @@ Expected: 1 non-fatal failure
 [0;32m[ RUN      ] [mExpectFatalFailureTest.SucceedsWhenThereIsOneFatalFailure
 [0;32m[       OK ] [mExpectFatalFailureTest.SucceedsWhenThereIsOneFatalFailure
 [0;32m[ RUN      ] [mExpectFatalFailureTest.FailsWhenThereIsNoFatalFailure
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual: 0 failures
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectFatalFailureTest.FailsWhenThereIsNoFatalFailure
 [0;32m[ RUN      ] [mExpectFatalFailureTest.FailsWhenThereAreTwoFatalFailures
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual: 2 failures
@@ -385,9 +384,9 @@ gtest_output_test_.cc:#: Fatal failure:
 Failed
 Expected fatal failure.
 
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectFatalFailureTest.FailsWhenThereAreTwoFatalFailures
 [0;32m[ RUN      ] [mExpectFatalFailureTest.FailsWhenThereIsOneNonfatalFailure
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual:
@@ -395,18 +394,19 @@ gtest_output_test_.cc:#: Non-fatal failure:
 Failed
 Expected non-fatal failure.
 
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectFatalFailureTest.FailsWhenThereIsOneNonfatalFailure
 [0;32m[ RUN      ] [mExpectFatalFailureTest.FailsWhenStatementReturns
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual: 0 failures
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectFatalFailureTest.FailsWhenStatementReturns
 [0;32m[ RUN      ] [mExpectFatalFailureTest.FailsWhenStatementThrows
-(expecting a failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual: 0 failures
+(expecting a failure)
 [0;31m[  FAILED  ] [mExpectFatalFailureTest.FailsWhenStatementThrows
 [0;32m[----------] [m2 tests from TypedTest/0, where TypeParam = int
 [0;32m[ RUN      ] [mTypedTest/0.Success
@@ -442,14 +442,12 @@ Expected failure
 [0;31m[  FAILED  ] [mUnsigned/TypedTestP/1.Failure, where TypeParam = unsigned int
 [0;32m[----------] [m4 tests from ExpectFailureTest
 [0;32m[ RUN      ] [mExpectFailureTest.ExpectFatalFailure
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual:
 gtest_output_test_.cc:#: Success:
 Succeeded
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual:
@@ -457,7 +455,6 @@ gtest_output_test_.cc:#: Non-fatal failure:
 Failed
 Expected non-fatal failure.
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure containing "Some other fatal failure expected."
   Actual:
@@ -465,16 +462,17 @@ gtest_output_test_.cc:#: Fatal failure:
 Failed
 Expected fatal failure.
 
+(expecting 1 failure)
+(expecting 1 failure)
+(expecting 1 failure)
 [0;31m[  FAILED  ] [mExpectFailureTest.ExpectFatalFailure
 [0;32m[ RUN      ] [mExpectFailureTest.ExpectNonFatalFailure
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual:
 gtest_output_test_.cc:#: Success:
 Succeeded
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual:
@@ -482,7 +480,6 @@ gtest_output_test_.cc:#: Fatal failure:
 Failed
 Expected fatal failure.
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure containing "Some other non-fatal failure."
   Actual:
@@ -490,16 +487,17 @@ gtest_output_test_.cc:#: Non-fatal failure:
 Failed
 Expected non-fatal failure.
 
+(expecting 1 failure)
+(expecting 1 failure)
+(expecting 1 failure)
 [0;31m[  FAILED  ] [mExpectFailureTest.ExpectNonFatalFailure
 [0;32m[ RUN      ] [mExpectFailureTest.ExpectFatalFailureOnAllThreads
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual:
 gtest_output_test_.cc:#: Success:
 Succeeded
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual:
@@ -507,7 +505,6 @@ gtest_output_test_.cc:#: Non-fatal failure:
 Failed
 Expected non-fatal failure.
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 fatal failure containing "Some other fatal failure expected."
   Actual:
@@ -515,16 +512,17 @@ gtest_output_test_.cc:#: Fatal failure:
 Failed
 Expected fatal failure.
 
+(expecting 1 failure)
+(expecting 1 failure)
+(expecting 1 failure)
 [0;31m[  FAILED  ] [mExpectFailureTest.ExpectFatalFailureOnAllThreads
 [0;32m[ RUN      ] [mExpectFailureTest.ExpectNonFatalFailureOnAllThreads
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual:
 gtest_output_test_.cc:#: Success:
 Succeeded
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual:
@@ -532,7 +530,6 @@ gtest_output_test_.cc:#: Fatal failure:
 Failed
 Expected fatal failure.
 
-(expecting 1 failure)
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure containing "Some other non-fatal failure."
   Actual:
@@ -540,35 +537,38 @@ gtest_output_test_.cc:#: Non-fatal failure:
 Failed
 Expected non-fatal failure.
 
+(expecting 1 failure)
+(expecting 1 failure)
+(expecting 1 failure)
 [0;31m[  FAILED  ] [mExpectFailureTest.ExpectNonFatalFailureOnAllThreads
 [0;32m[----------] [m2 tests from ExpectFailureWithThreadsTest
 [0;32m[ RUN      ] [mExpectFailureWithThreadsTest.ExpectFatalFailure
-(expecting 2 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected fatal failure.
 gtest.cc:#: Failure
 Expected: 1 fatal failure
   Actual: 0 failures
+(expecting 2 failures)
 [0;31m[  FAILED  ] [mExpectFailureWithThreadsTest.ExpectFatalFailure
 [0;32m[ RUN      ] [mExpectFailureWithThreadsTest.ExpectNonFatalFailure
-(expecting 2 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected non-fatal failure.
 gtest.cc:#: Failure
 Expected: 1 non-fatal failure
   Actual: 0 failures
+(expecting 2 failures)
 [0;31m[  FAILED  ] [mExpectFailureWithThreadsTest.ExpectNonFatalFailure
 [0;32m[----------] [m1 test from ScopedFakeTestPartResultReporterTest
 [0;32m[ RUN      ] [mScopedFakeTestPartResultReporterTest.InterceptOnlyCurrentThread
-(expecting 2 failures)
 gtest_output_test_.cc:#: Failure
 Failed
 Expected fatal failure.
 gtest_output_test_.cc:#: Failure
 Failed
 Expected non-fatal failure.
+(expecting 2 failures)
 [0;31m[  FAILED  ] [mScopedFakeTestPartResultReporterTest.InterceptOnlyCurrentThread
 [0;32m[----------] [m1 test from PrintingFailingParams/FailingParamTest
 [0;32m[ RUN      ] [mPrintingFailingParams/FailingParamTest.Fails/0
@@ -639,39 +639,39 @@ Expected fatal failure.
 [----------] Global test environment set-up.
 [----------] 3 tests from FatalFailureTest
 [ RUN      ] FatalFailureTest.FatalFailureInSubroutine
-(expecting a failure that x should be 1)
 gtest_output_test_.cc:#: Failure
 Value of: x
   Actual: 2
 Expected: 1
+(expecting a failure that x should be 1)
 [  FAILED  ] FatalFailureTest.FatalFailureInSubroutine (? ms)
 [ RUN      ] FatalFailureTest.FatalFailureInNestedSubroutine
-(expecting a failure that x should be 1)
 gtest_output_test_.cc:#: Failure
 Value of: x
   Actual: 2
 Expected: 1
+(expecting a failure that x should be 1)
 [  FAILED  ] FatalFailureTest.FatalFailureInNestedSubroutine (? ms)
 [ RUN      ] FatalFailureTest.NonfatalFailureInSubroutine
-(expecting a failure on false)
 gtest_output_test_.cc:#: Failure
 Value of: false
   Actual: false
 Expected: true
+(expecting a failure on false)
 [  FAILED  ] FatalFailureTest.NonfatalFailureInSubroutine (? ms)
 [----------] 3 tests from FatalFailureTest (? ms total)
 
 [----------] 1 test from LoggingTest
 [ RUN      ] LoggingTest.InterleavingLoggingAndAssertions
+gtest_output_test_.cc:#: Failure
+Expected: (3) >= (a[i]), actual: 3 vs 9
+gtest_output_test_.cc:#: Failure
+Expected: (3) >= (a[i]), actual: 3 vs 6
 (expecting 2 failures on (3) >= (a[i]))
 i == 0
 i == 1
-gtest_output_test_.cc:#: Failure
-Expected: (3) >= (a[i]), actual: 3 vs 9
 i == 2
 i == 3
-gtest_output_test_.cc:#: Failure
-Expected: (3) >= (a[i]), actual: 3 vs 6
 [  FAILED  ] LoggingTest.InterleavingLoggingAndAssertions (? ms)
 [----------] 1 test from LoggingTest (? ms total)
 

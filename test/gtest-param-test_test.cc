@@ -48,6 +48,8 @@
 # define GTEST_IMPLEMENTATION_ 1
 # include "src/gtest-internal-inl.h"  // for UnitTestOptions
 # undef GTEST_IMPLEMENTATION_
+# include "gtest/internal/gtest-port.h"
+# include "gtest/internal/gtest-internal.h"
 
 # include "test/gtest-param-test_test.h"
 
@@ -71,6 +73,11 @@ using ::std::tr1::tuple;
 
 using ::testing::internal::ParamGenerator;
 using ::testing::internal::UnitTestOptions;
+
+// file opened at start
+// contains information produced by test cases (that may run in subprocesses) and
+// verified after all test are finished.
+static FILE* log_file = NULL;
 
 // Prints a value to a string.
 //
@@ -561,63 +568,6 @@ TEST(ParamGeneratorTest, AssignmentWorks) {
 // fixture constructor, SetUp(), and TearDown() have run and have been
 // supplied with the correct parameters.
 
-// The use of environment object allows detection of the case where no test
-// case functionality is run at all. In this case TestCaseTearDown will not
-// be able to detect missing tests, naturally.
-template <int kExpectedCalls>
-class TestGenerationEnvironment : public ::testing::Environment {
- public:
-  static TestGenerationEnvironment* Instance() {
-    static TestGenerationEnvironment* instance = new TestGenerationEnvironment;
-    return instance;
-  }
-
-  void FixtureConstructorExecuted() { fixture_constructor_count_++; }
-  void SetUpExecuted() { set_up_count_++; }
-  void TearDownExecuted() { tear_down_count_++; }
-  void TestBodyExecuted() { test_body_count_++; }
-
-  virtual void TearDown() {
-    // If all MultipleTestGenerationTest tests have been de-selected
-    // by the filter flag, the following checks make no sense.
-    bool perform_check = false;
-
-    for (int i = 0; i < kExpectedCalls; ++i) {
-      Message msg;
-      msg << "TestsExpandedAndRun/" << i;
-      if (UnitTestOptions::FilterMatchesTest(
-             "TestExpansionModule/MultipleTestGenerationTest",
-              msg.GetString().c_str())) {
-        perform_check = true;
-      }
-    }
-    if (perform_check) {
-      EXPECT_EQ(kExpectedCalls, fixture_constructor_count_)
-          << "Fixture constructor of ParamTestGenerationTest test case "
-          << "has not been run as expected.";
-      EXPECT_EQ(kExpectedCalls, set_up_count_)
-          << "Fixture SetUp method of ParamTestGenerationTest test case "
-          << "has not been run as expected.";
-      EXPECT_EQ(kExpectedCalls, tear_down_count_)
-          << "Fixture TearDown method of ParamTestGenerationTest test case "
-          << "has not been run as expected.";
-      EXPECT_EQ(kExpectedCalls, test_body_count_)
-          << "Test in ParamTestGenerationTest test case "
-          << "has not been run as expected.";
-    }
-  }
- private:
-  TestGenerationEnvironment() : fixture_constructor_count_(0), set_up_count_(0),
-                                tear_down_count_(0), test_body_count_(0) {}
-
-  int fixture_constructor_count_;
-  int set_up_count_;
-  int tear_down_count_;
-  int test_body_count_;
-
-  GTEST_DISALLOW_COPY_AND_ASSIGN_(TestGenerationEnvironment);
-};
-
 const int test_generation_params[] = {36, 42, 72};
 
 class TestGenerationTest : public TestWithParam<int> {
@@ -627,66 +577,32 @@ class TestGenerationTest : public TestWithParam<int> {
         sizeof(test_generation_params)/sizeof(test_generation_params[0])
   };
 
-  typedef TestGenerationEnvironment<PARAMETER_COUNT> Environment;
-
   TestGenerationTest() {
-    Environment::Instance()->FixtureConstructorExecuted();
+    fprintf(log_file, "TestGenerationTest.TestsExpandedAndRun:FixtureConstructorExecuted\n");
     current_parameter_ = GetParam();
   }
   virtual void SetUp() {
-    Environment::Instance()->SetUpExecuted();
+    fprintf(log_file, "TestGenerationTest.TestsExpandedAndRun:SetUpExecuted\n");
     EXPECT_EQ(current_parameter_, GetParam());
   }
   virtual void TearDown() {
-    Environment::Instance()->TearDownExecuted();
+      fprintf(log_file, "TestGenerationTest.TestsExpandedAndRun:TearDownExecuted\n");
     EXPECT_EQ(current_parameter_, GetParam());
-  }
-
-  static void SetUpTestCase() {
-    bool all_tests_in_test_case_selected = true;
-
-    for (int i = 0; i < PARAMETER_COUNT; ++i) {
-      Message test_name;
-      test_name << "TestsExpandedAndRun/" << i;
-      if ( !UnitTestOptions::FilterMatchesTest(
-                "TestExpansionModule/MultipleTestGenerationTest",
-                test_name.GetString())) {
-        all_tests_in_test_case_selected = false;
-      }
-    }
-    EXPECT_TRUE(all_tests_in_test_case_selected)
-        << "When running the TestGenerationTest test case all of its tests\n"
-        << "must be selected by the filter flag for the test case to pass.\n"
-        << "If not all of them are enabled, we can't reliably conclude\n"
-        << "that the correct number of tests have been generated.";
-
-    collected_parameters_.clear();
-  }
-
-  static void TearDownTestCase() {
-    vector<int> expected_values(test_generation_params,
-                                test_generation_params + PARAMETER_COUNT);
-    // Test execution order is not guaranteed by Google Test,
-    // so the order of values in collected_parameters_ can be
-    // different and we have to sort to compare.
-    sort(expected_values.begin(), expected_values.end());
-    sort(collected_parameters_.begin(), collected_parameters_.end());
-
-    EXPECT_TRUE(collected_parameters_ == expected_values);
   }
  protected:
   int current_parameter_;
-  static vector<int> collected_parameters_;
 
  private:
   GTEST_DISALLOW_COPY_AND_ASSIGN_(TestGenerationTest);
 };
-vector<int> TestGenerationTest::collected_parameters_;
 
 TEST_P(TestGenerationTest, TestsExpandedAndRun) {
-  Environment::Instance()->TestBodyExecuted();
+    
+  fprintf(log_file, "TestGenerationTest.TestsExpandedAndRun:TestBodyExecuted\n");
+  
   EXPECT_EQ(current_parameter_, GetParam());
-  collected_parameters_.push_back(GetParam());
+  
+  fprintf(log_file, "TestGenerationTest.TestsExpandedAndRun/%d\n", GetParam());
 }
 INSTANTIATE_TEST_CASE_P(TestExpansionModule, TestGenerationTest,
                         ValuesIn(test_generation_params));
@@ -765,24 +681,15 @@ class SeparateInstanceTest : public TestWithParam<int> {
  public:
   SeparateInstanceTest() : count_(0) {}
 
-  static void TearDownTestCase() {
-    EXPECT_GE(global_count_, 2)
-        << "If some (but not all) SeparateInstanceTest tests have been "
-        << "filtered out this test will fail. Make sure that all "
-        << "GeneratorEvaluationTest are selected or de-selected together "
-        << "by the test filter.";
-  }
-
  protected:
   int count_;
-  static int global_count_;
 };
-int SeparateInstanceTest::global_count_ = 0;
 
 TEST_P(SeparateInstanceTest, TestsRunInSeparateInstances) {
   EXPECT_EQ(0, count_++);
-  global_count_++;
+  fprintf(log_file, "SeparateInstanceTest.TestsRunInSeparateInstances\n");
 }
+
 INSTANTIATE_TEST_CASE_P(FourElemSequence, SeparateInstanceTest, Range(1, 4));
 
 // Tests that all instantiations of a test have named appropriately. Test
@@ -860,7 +767,8 @@ TEST_F(NonParameterizedBaseTest, FixtureIsInitialized) {
 TEST_P(ParameterizedDerivedTest, SeesSequence) {
   EXPECT_EQ(17, n_);
   EXPECT_EQ(0, count_++);
-  EXPECT_EQ(GetParam(), global_count_++);
+  
+  fprintf(log_file, "ParameterizedDerivedTest.SeesSequence/%d\n", GetParam());
 }
 
 INSTANTIATE_TEST_CASE_P(RangeZeroToFive, ParameterizedDerivedTest, Range(0, 5));
@@ -873,10 +781,143 @@ TEST(CompileTest, CombineIsDefinedOnlyWhenGtestHasParamTestIsDefined) {
 #endif
 }
 
+testing::internal::String ReadEntireFile(FILE* file) {    
+  fseek(file, 0, SEEK_END);
+  const size_t file_size = static_cast<size_t>(ftell(file));
+  
+  char* const buffer = new char[file_size];
+
+  size_t bytes_last_read = 0;  // # of bytes read in the last fread()
+  size_t bytes_read = 0;       // # of bytes read so far
+
+  fseek(file, 0, SEEK_SET);
+
+  // Keeps reading the file until we cannot read further or the
+  // pre-determined file size is reached.
+  do {
+    bytes_last_read = fread(buffer+bytes_read, 1, file_size-bytes_read, file);
+    bytes_read += bytes_last_read;
+  } while (bytes_last_read > 0 && bytes_read < file_size);
+
+  const testing::internal::String content(buffer, bytes_read);
+  delete[] buffer;
+  return content;
+}
+
+int CountOccurences(const char* contents, const char* pattern) {
+  int occurences = 0;
+  const char* pos = strstr(contents, pattern);
+  while (pos != NULL) {
+    occurences++;
+    pos = strstr(pos + strlen(pattern), pattern);
+  }
+  return occurences;
+}
+
+void VerifySeparateInstanceTests(const testing::internal::String& contents) {
+  int instance_count = CountOccurences(contents.c_str(), 
+    "SeparateInstanceTest.TestsRunInSeparateInstances");
+  EXPECT_GE(instance_count, 2)
+      << "If some (but not all) SeparateInstanceTest tests have been "
+      << "filtered out this test will fail. Make sure that all "
+      << "GeneratorEvaluationTest are selected or de-selected together "
+      << "by the test filter.";
+}
+
+void VerifyTestGenerationParamTests(const testing::internal::String& contents) {
+  bool all_tests_in_test_case_selected = true;
+
+  for (int i = 0; i < TestGenerationTest::PARAMETER_COUNT; ++i) {
+    Message test_name;
+    test_name << "TestsExpandedAndRun/" << i;
+    if ( !UnitTestOptions::FilterMatchesTest(
+              "TestExpansionModule/MultipleTestGenerationTest",
+              test_name.GetString())) {
+      all_tests_in_test_case_selected = false;
+    }
+  }
+  EXPECT_TRUE(all_tests_in_test_case_selected)
+      << "When running the TestGenerationTest test case all of its tests\n"
+      << "must be selected by the filter flag for the test case to pass.\n"
+      << "If not all of them are enabled, we can't reliably conclude\n"
+      << "that the correct number of tests have been generated.";
+       
+  for (const int* expected_value = test_generation_params;
+      expected_value < test_generation_params + TestGenerationTest::PARAMETER_COUNT; 
+      expected_value++) {
+        Message expected_logged_string;
+        expected_logged_string << "TestGenerationTest.TestsExpandedAndRun/" << *expected_value;
+   
+    EXPECT_TRUE (strstr(contents.c_str(), expected_logged_string.GetString().c_str()) != NULL); 
+  }
+}
+
+void VerifyTestGenerationTests(const testing::internal::String& contents) {
+  // If all MultipleTestGenerationTest tests have been de-selected
+  // by the filter flag, the following checks make no sense.
+  bool perform_check = false;
+
+  for (int i = 0; i < TestGenerationTest::PARAMETER_COUNT; ++i) {
+    Message msg;
+    msg << "TestsExpandedAndRun/" << i;
+    if (UnitTestOptions::FilterMatchesTest(
+         "TestExpansionModule/MultipleTestGenerationTest",
+          msg.GetString().c_str())) {
+      perform_check = true;
+    }
+  }
+  int fixture_constructor_count = CountOccurences(contents.c_str(), 
+    "TestGenerationTest.TestsExpandedAndRun:FixtureConstructorExecuted");
+  int set_up_count = CountOccurences(contents.c_str(), 
+    "TestGenerationTest.TestsExpandedAndRun:SetUpExecuted");
+  int tear_down_count = CountOccurences(contents.c_str(), 
+    "TestGenerationTest.TestsExpandedAndRun:TearDownExecuted");
+  int test_body_count = CountOccurences(contents.c_str(), 
+    "TestGenerationTest.TestsExpandedAndRun:TestBodyExecuted");
+  
+  if (perform_check) {
+    EXPECT_EQ(TestGenerationTest::PARAMETER_COUNT, fixture_constructor_count)
+      << "Fixture constructor of ParamTestGenerationTest test case "
+      << "has not been run as expected.";
+    EXPECT_EQ(TestGenerationTest::PARAMETER_COUNT, set_up_count)
+      << "Fixture SetUp method of ParamTestGenerationTest test case "
+      << "has not been run as expected.";
+    EXPECT_EQ(TestGenerationTest::PARAMETER_COUNT, tear_down_count)
+      << "Fixture TearDown method of ParamTestGenerationTest test case "
+      << "has not been run as expected.";
+    EXPECT_EQ(TestGenerationTest::PARAMETER_COUNT, test_body_count)
+      << "Test in ParamTestGenerationTest test case "
+      << "has not been run as expected.";
+  }    
+}
+
+void VerifyParameterizedDerivedTests(const testing::internal::String& contents) {
+    const char* expected_contents[] = {
+        "ParameterizedDerivedTest.SeesSequence/0",
+        "ParameterizedDerivedTest.SeesSequence/1",
+        "ParameterizedDerivedTest.SeesSequence/2",
+        "ParameterizedDerivedTest.SeesSequence/3",
+        "ParameterizedDerivedTest.SeesSequence/4"
+    };    
+    for (int i = 0; i < 5; i++) {
+        EXPECT_TRUE (strstr(contents.c_str(), expected_contents[i]) != NULL);
+    }
+}
+
+void VerifyTestLogFile() {
+    testing::internal::String contents = ReadEntireFile(log_file);    
+    VerifyParameterizedDerivedTests(contents);
+    VerifyTestGenerationTests(contents);
+    VerifyTestGenerationParamTests(contents);
+    VerifySeparateInstanceTests(contents);
+}
+
 int main(int argc, char **argv) {
+    char name_template[] = "/tmp/gtest_log.XXXXXX";
+    int log_fd = mkstemp(name_template);
+    log_file = testing::internal::posix::FDOpen(log_fd, "w+");    
+    
 #if GTEST_HAS_PARAM_TEST
-  // Used in TestGenerationTest test case.
-  AddGlobalTestEnvironment(TestGenerationTest::Environment::Instance());
   // Used in GeneratorEvaluationTest test case. Tests that the updated value
   // will be picked up for instantiating tests in GeneratorEvaluationTest.
   GeneratorEvaluationTest::set_param_value(1);
@@ -891,5 +932,15 @@ int main(int argc, char **argv) {
   GeneratorEvaluationTest::set_param_value(2);
 #endif  // GTEST_HAS_PARAM_TEST
 
-  return RUN_ALL_TESTS();
+  int ret_val = RUN_ALL_TESTS();
+  
+  VerifyTestLogFile();
+  // We need to check manually for ad hoc test failures that happen after
+  // RUN_ALL_TESTS finishes.
+  if (testing::UnitTest::GetInstance()->Failed()) {
+    ret_val = 1;
+  }
+  testing::internal::posix::FClose(log_file);
+  log_fd = -1;
+  return ret_val;
 }

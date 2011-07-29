@@ -259,6 +259,7 @@ TEST(GetNextRandomSeedTest, WorksForValidInput) {
 static void ClearCurrentTestPartResults() {
   TestResultAccessor::ClearTestPartResults(
       GetUnitTestImpl()->current_test_result());
+  GetUnitTestImpl()->current_test_runner()->ClearCurrentTestPartResults();
 }
 
 // Tests GetTypeId.

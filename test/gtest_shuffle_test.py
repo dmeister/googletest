@@ -83,7 +83,6 @@ def RunAndReturnOutput(extra_env, args):
 
   return gtest_test_utils.Subprocess([COMMAND] + args, env=environ_copy).output
 
-
 def GetTestsForAllIterations(extra_env, args):
   """Runs the test program and returns a list of test lists.
 
@@ -95,7 +94,6 @@ def GetTestsForAllIterations(extra_env, args):
     A list where the i-th element is the list of tests run in the i-th
     test iteration.
   """
-
   test_iterations = []
   for line in RunAndReturnOutput(extra_env, args).split('\n'):
     if line.startswith('----'):
@@ -103,7 +101,7 @@ def GetTestsForAllIterations(extra_env, args):
       test_iterations.append(tests)
     elif line.strip():
       tests.append(line.strip())  # 'TestCaseName.TestName'
-
+ 
   return test_iterations
 
 
@@ -150,7 +148,7 @@ def CalculateTestLists():
   if not SHUFFLED_ALL_TESTS:
     SHUFFLED_ALL_TESTS.extend(GetTestsForAllIterations(
         {}, [AlsoRunDisabledTestsFlag(), ShuffleFlag(), RandomSeedFlag(1)])[0])
-
+  
   if not SHUFFLED_ACTIVE_TESTS:
     SHUFFLED_ACTIVE_TESTS.extend(GetTestsForAllIterations(
         {}, [ShuffleFlag(), RandomSeedFlag(1)])[0])
@@ -223,7 +221,7 @@ class GTestShuffleUnitTest(gtest_test_utils.TestCase):
     for test in SHUFFLED_SHARDED_TESTS:
       self.assert_(test in SHARDED_TESTS, '%s is an invalid test' % (test,))
 
-  def testShuffleIncludesAllTests(self):
+  def testShuffleIncludesAllTests(self):	
     for test in ALL_TESTS:
       self.assert_(test in SHUFFLED_ALL_TESTS, '%s is missing' % (test,))
     for test in ACTIVE_TESTS:
