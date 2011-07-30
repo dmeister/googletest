@@ -205,8 +205,13 @@ TEST_F(TestForCrashSafeTestingTearDownDie, DoesNothing) {
 }
 
 int main(int argc, char **argv) {
+#ifdef GTEST_HAS_CRASH_SAFE_TEST_RUNNER
   testing::GTEST_FLAG(crash_safe) = true;
 
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+#else
+  fprintf(stdout, "Crash safe test execution is not available. Test skipped")
+  return 1;
+#endif
 }

@@ -1,4 +1,4 @@
-// Copyright 2005, Google Inc.
+// Copyright 2011, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: wan@google.com (Zhanyong Wan), vladl@google.com (Vlad Losev)
+// Author: wan@google.com (Zhanyong Wan), vladl@google.com (Vlad Losev),
+//         dirkmeister@acm.org (Dirk Meister)
 //
 // This file implements tests executes in a subprocess
 
@@ -88,14 +89,9 @@ static const char kTestRunnerExited = 'E';
 static const char kTestRunnerClearTestResult = 'C';
 
 // An enumeration describing all of the possible ways that a death test can
-// conclude.  DIED means that the process died while executing the test
-// code; LIVED means that process lived beyond the end of the test code;
-// RETURNED means that the test statement attempted to execute a return
-// statement, which is not allowed; THREW means that the test statement
-// returned control by throwing an exception.  IN_PROGRESS means the test
-// has not yet concluded.
-// TODO(vladl@google.com): Unify names and possibly values for
-// AbortReason, DeathTestOutcome, and flag characters above.
+// conclude.  TEST_DIED means that the process died while executing the test
+// code; IN_PROGRESS means the test has not yet concluded; TEST_EXITED means
+// that the test exited in a controlled fashion.
 enum TestRunnerOutcome { TEST_IN_PROGRESS, TEST_DIED, TEST_EXITED };
 
 // Routine for aborting the program from either the test runner
@@ -185,6 +181,9 @@ public:
 # if GTEST_HAS_CRASH_SAFE_TEST_RUNNER
 
 // Provides cross platform implementation for some test runner functionality.
+// The test runner implementations have two pipes. One main pipe to transfer
+// state informations e.g. new test part results to the parent process, and
+// a secondary pipe used to send acknowledgements to the child.
 class TestRunnerImpl : public TestRunner {
  protected:
   TestRunnerImpl() :
@@ -205,11 +204,11 @@ class TestRunnerImpl : public TestRunner {
   int write_fd() const { return write_fd_; }
   void set_write_fd(int fd) { write_fd_ = fd; }
 
-  // Called in the parent process only. Reads the result code of the death
-  // test child process via a pipe, interprets it to set the outcome_
-  // member, and closes read_fd_.  Outputs diagnostics and terminates in
-  // case of unexpected codes.
-  void ReadAndInterpretStatusByte();
+  // Called in the parent process only. Reads inter-process communication
+  // channel (a pipe under OS X/Linux) and interprets the next message.
+  // After interpreting the message, the message is acknowledged to the
+  // subprocess.
+  void ReadAndInterpretChildMessages();
 
   virtual bool ProcessOutcome();
 
@@ -218,39 +217,46 @@ class TestRunnerImpl : public TestRunner {
   virtual void RecordProperty(const char* key, const char* value);
 
   virtual void SetUp();
+  
   virtual void TearDown();
 
   virtual void ClearCurrentTestPartResults();
 
  private:
-  // True if the death test child process has been successfully spawned.
+  // True if the test runner child process has been successfully spawned.
   bool spawned_;
   // How the test runner concluded.
   TestRunnerOutcome outcome_;
-  // Descriptor to the read end of the pipe to the child process.  It is
-  // always -1 in the child process.  The child keeps its write end of the
-  // pipe in write_fd_.
+  // Descriptor to the read end of a pipe.
   int read_fd_;
-  // Descriptor to the child's write end of the pipe to the parent process.
-  // It is always -1 in the parent process.  The parent keeps its end of the
-  // pipe in read_fd_.
+  // Descriptor to the write end of a pipe.
   int write_fd_;
+  
+  // mutex used by the child to ensure that
+  // only a single thread transfers data through the inter-process
+  // pipe
+  Mutex child_mutex_;
 };
 
 void TestRunnerImpl::SetUp() {
 }
 
 void TestRunnerImpl::TearDown() {
-	posix::Write(write_fd(), "E", 1);
+	posix::Write(write_fd(), &kTestRunnerExited, 1);
 }
 
-// str can be NULL
+// Serialized a string into a format that can be send throug the pipe
+// (str can be NULL). 
+//
+// An serialization approch with explicit string length data is used
+// instead of a delimiter-style because the delimiter can also be in the
+// message.
 void SerializeString(const char* str, string* data) {
   if(str != NULL) {
     char null_flag = 1;
     data->append(&null_flag, 1);
     
-	  int32_t s = strlen(str); // TODO (dmeister) Use strnlen with constant for maximal path
+	  int32_t s = strlen(str);
 	  data->append(reinterpret_cast<char*>(&s), sizeof(s));
 	  data->append(str);
   } else {
@@ -260,9 +266,6 @@ void SerializeString(const char* str, string* data) {
 }
 
 // Serializes a test part result into a string.
-// We use a string length, string contents based approach, we any delimiter-style
-// serializtion would be difficult as the delimiter can also be in the result
-// message
 void SerializeTestPartResult(const TestPartResult& result, string* data) {
 	// result type indicator
 	if(result.type() == TestPartResult::kSuccess) {
@@ -293,6 +296,8 @@ int SafeRead(int read_fd, char* output, int bytes_to_read) {
 	return total_bytes_read;
 }
 
+// returns -1 in case of an error, 0 if EOF is reached (unexpected), any positive integer
+// otherwise
 int ExtractStringFromStream(int read_fd, String* data) {
   char null_flag;
   int bytes_null_flag_size = SafeRead(read_fd, &null_flag, 1);
@@ -362,16 +367,12 @@ int ExtractTestPartResultFromStream(int read_fd, TestPartResult** result) {
 	return 1; // any positive integer is ok
 }
 
+// writes a simple ack message to the write end of a pipe
 void WriteAcknowledge(int write_fd) {
     posix::Write(write_fd, "A", 1);
 }
 
-// Called in the parent process only. Reads the result code of the death
-// test child process via a pipe, interprets it to set the outcome_
-// member, and closes read_fd_.  Outputs diagnostics and terminates in
-// case of unexpected codes.
-// TODO (dmeister) Change name
-void TestRunnerImpl::ReadAndInterpretStatusByte() {
+void TestRunnerImpl::ReadAndInterpretChildMessages() {
   char flag;
   int bytes_read;
   TestPartResult* result = NULL;
@@ -456,6 +457,7 @@ bool TestRunnerImpl::ProcessOutcome() {
 	return true;
 }
 
+// Called in child process only
 void WaitForAcknowledge(int read_fd) {
   char flag;
   int read_bytes = posix::Read(read_fd, &flag, 1);
@@ -466,6 +468,7 @@ void WaitForAcknowledge(int read_fd) {
 // Called in child process only
 void TestRunnerImpl::ClearCurrentTestPartResults() {
   GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
+  MutexLock scoped_child_lock(&child_mutex_);
 
 	// TODO (dmeister) Use a safe write method
 	posix::Write(write_fd(), "C", 1);
@@ -475,7 +478,8 @@ void TestRunnerImpl::ClearCurrentTestPartResults() {
 // Called in child process only
 void TestRunnerImpl::ReportTestPartResult(const TestPartResult& result) {
 	GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
-	
+	MutexLock scoped_child_lock(&child_mutex_);
+	  
 	string data;
 	data.append("R"); // for test part result
 	SerializeTestPartResult(result, &data);
@@ -487,9 +491,11 @@ void TestRunnerImpl::ReportTestPartResult(const TestPartResult& result) {
   WaitForAcknowledge(read_fd());
 }
 
+// Called in child process only
 void TestRunnerImpl::RecordProperty(const char* key, const char* value) {
   GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
-  	
+  MutexLock scoped_child_lock(&child_mutex_);
+  	  
   string data;
   data.append(&kTestRunnerTestProperty, 1);
   SerializeString(key, &data);
@@ -530,7 +536,7 @@ int ForkingTestRunner::Wait() {
   if (!spawned())
     return 0;
 
-  ReadAndInterpretStatusByte();
+  ReadAndInterpretChildMessages();
 
   int status_value;
   GTEST_DEATH_TEST_CHECK_SYSCALL_(waitpid(child_pid_, &status_value, 0));
@@ -612,13 +618,16 @@ bool DefaultTestRunnerFactory::Create(TestRunner** test_runner) {
 # if GTEST_HAS_CRASH_SAFE_TEST_RUNNER
   *test_runner = new NoExecTestRunner();
 # else
-  GTEST_LOG_(FATAL) << "Crash safe test execution is currently not supported on this platform.";
-  return false;
+  GTEST_LOG_(INFO) << "Crash safe test execution is currently not " <<
+    "supported on this platform.";
+  *test_runner = new DirectTestRunner();
+  return true;
 # endif  // GTEST_HAS_CRASH_SAFE_TEST_RUNNER
   return true;
 }
 
-void TestRunnerTestPartResultReporter::ReportTestPartResult(const TestPartResult& result) {
+void TestRunnerTestPartResultReporter::ReportTestPartResult(
+    const TestPartResult& result) {
 	original_reporter_->ReportTestPartResult(result);
 	test_runner_->ReportTestPartResult(result);
 }

@@ -1,4 +1,4 @@
-// Copyright 2005, Google Inc.
+// Copyright 2011, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Authors: wan@google.com (Zhanyong Wan), eefacm@gmail.com (Sean Mcafee)
+// Authors: wan@google.com (Zhanyong Wan), eefacm@gmail.com (Sean Mcafee),
+//          dirkmeister@acm.org (Dirk Meister)
 //
 // The Google C++ Testing Framework (Google Test)
 //
@@ -50,37 +51,34 @@ namespace internal {
 // Names of the flags (needed for parsing Google Test flags).
 const char kCrashSafeFlag[] = "crash_safe";
 
-// DeathTest is a class that hides much of the complexity of the
-// GTEST_DEATH_TEST_ macro.  It is abstract; its static Create method
-// returns a concrete class that depends on the prevailing death test
-// style, as defined by the --gtest_death_test_style and/or
-// --gtest_internal_run_death_test flags.
-
-// In describing the results of death tests, these terms are used with
-// the corresponding definitions:
+// TestRunner is a class that is responsible for running the actual test.
+// It may or may not create a isolated subprocess in which the actual test is 
+// than executed. It is abstract; its static Create method
+// returns a concrete class that depends on the --gtest_crash_safe flag.
+// By default or --gtest_crash_safe=false a direct test runner is used that
+// executed the test in the same process. With --gtest_crash_safe=true, a
+// subprocess is created so that crashes of the test do not effect the
+// execution of other tests.
 //
-// exit status:  The integer exit information in the format specified
-//               by wait(2)
-// exit code:    The integer code passed to exit(3), _exit(2), or
-//               returned from main()
+// Currently crash safe test execution is only available on OS X and Linux.
+// Other platforms and test runner implementations may follow.
+
 class TestRunner {
  public:
   // Create returns false if there was an error determining the
-  // appropriate action to take for the current death test; for example,
-  // if the gtest_death_test_style flag is set to an invalid value.
-  // The LastMessage method will return a more detailed message in that
-  // case.  Otherwise, the DeathTest pointer pointed to by the "test"
-  // argument is set.  If the death test should be skipped, the pointer
-  // is set to NULL; otherwise, it is set to the address of a new concrete
-  // DeathTest object that controls the execution of the current test.
+  // appropriate action to take for the current test runner;
+  // Otherwise, the test_runner pointer should be set to 
+  // a new concrete TestRunner that controls the execution of 
+  // the current test.
   static bool Create(TestRunner** test_runner);
+  
   TestRunner();
   virtual ~TestRunner() { }
 
-  // An enumeration of possible roles that may be taken when a death
-  // test is encountered.  EXECUTE means that the death test logic should
-  // be executed immediately.  OVERSEE means that the program should prepare
-  // the appropriate environment for a child process to execute the death
+  // An enumeration of possible roles that may be taken when a test
+  // runner is encountered.  EXECUTE_TEST means that the test runner logic should
+  // be executed immediately.  OVERSEE_TEST means that the program should prepare
+  // the appropriate environment for a child process to execute the
   // test, then wait for it to complete.
   enum Role { OVERSEE_TEST, EXECUTE_TEST };
 
@@ -88,21 +86,29 @@ class TestRunner {
   virtual Role AssumeRole() = 0;
 
   // Waits for the test runner to finish.
+  // Called only when role is OVERSEE_TEST
   virtual int Wait() = 0;
 
+  // Processes the outcome of the test
+  // Called only when role is OVERSEE_TEST
   virtual bool ProcessOutcome() = 0;
 
+  // Reports a test part result to the parent process if appropriate
+  // Called only when role is EXECUTE_TEST
   virtual void ReportTestPartResult(const TestPartResult& result) = 0;
   
+  // Reports a test property to the parent process if appropriate
+  // Called only when role is EXECUTE_TEST
   virtual void RecordProperty(const char* key, const char* value) = 0;
 
+  // Called only when role is EXECUTE_TEST
   virtual void SetUp() = 0;
 
+  // Called only when role is EXECUTE_TEST
   virtual void TearDown() = 0;
   
-  /**
-   * Used internally for testing purposes
-   */
+  // Used internally for testing purposes
+  // Called only when role is EXECUTE_TEST 
   virtual void ClearCurrentTestPartResults() = 0;
 
  private:
@@ -123,9 +129,16 @@ class DefaultTestRunnerFactory : public TestRunnerFactory {
   virtual bool Create(TestRunner** test_runner);
 };
 
+// Result reporter used in the child process to redirect all
+// test part results first to the test runner. The
+// test runner than may forward the result to the parent process,
+// but is always forwards the result to the original reporter to that
+// the state of the child process and the state of the parent process are 
+// the same
 class TestRunnerTestPartResultReporter : public TestPartResultReporterInterface {
   public:
-	inline TestRunnerTestPartResultReporter(TestPartResultReporterInterface* original_reporter,
+	inline TestRunnerTestPartResultReporter(
+	  TestPartResultReporterInterface* original_reporter,
 		TestRunner* test_runner);
 	
 	virtual void ReportTestPartResult(const TestPartResult& result);

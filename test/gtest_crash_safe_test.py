@@ -66,6 +66,10 @@ class GTestCrashSafeTest(gtest_test_utils.TestCase):
       self.assert_(p.exited)
       self.assertEquals(1, p.exit_code)
       
+      if p.output.find("Crash safe test execution is not available. Test skipped") >= 0:
+        # Test skipped
+        return
+      
       self.VerifyCrashes(p.output)
 
 if __name__ == "__main__":
