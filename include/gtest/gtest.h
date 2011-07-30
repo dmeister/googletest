@@ -159,6 +159,7 @@ class TestResultAccessor;
 class TestEventListenersAccessor;
 class TestEventRepeater;
 class WindowsDeathTest;
+class TestRunnerImpl;
 
 class UnitTestImpl* GetUnitTestImpl();
 void ReportFailureInUnknownLocation(TestPartResult::Type result_type,
@@ -556,7 +557,8 @@ class GTEST_API_ TestResult {
   friend class internal::TestResultAccessor;
   friend class internal::UnitTestImpl;
   friend class internal::WindowsDeathTest;
-
+  friend class internal::TestRunnerImpl;
+  
   // Gets the vector of TestPartResults.
   const std::vector<TestPartResult>& test_part_results() const {
     return test_part_results_;

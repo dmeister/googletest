@@ -83,6 +83,7 @@ namespace internal {
 // Utilities needed for test runner.
 
 static const char kTestRunnerTestPartResult = 'R';
+static const char kTestRunnerTestProperty = 'P';
 static const char kTestRunnerExited = 'E';
 static const char kTestRunnerClearTestResult = 'C';
 
@@ -146,16 +147,6 @@ bool TestRunner::Create(TestRunner** test_runner) {
   return GetUnitTestImpl()->test_runner_factory()->Create(test_runner);
 }
 
-const char* TestRunner::LastMessage() {
-  return last_test_message_.c_str();
-}
-
-void TestRunner::set_last_test_message(const String& message) {
-  last_test_message_ = message;
-}
-
-String TestRunner::last_test_message_;
-
 // Basic direct (non crash safe) test runner implementation
 class DirectTestRunner : public TestRunner {
 public:
@@ -175,6 +166,10 @@ public:
 
   virtual void ReportTestPartResult(const TestPartResult& /*result*/) {
     // There is no parent process we have to forward the test part result
+  }
+
+  virtual void RecordProperty(const char* /*key*/, const char* /*value*/) {
+    // There is no parent process we have to forward the test property
   }
 
   virtual void SetUp() {
@@ -219,6 +214,8 @@ class TestRunnerImpl : public TestRunner {
   virtual bool ProcessOutcome();
 
   virtual void ReportTestPartResult(const TestPartResult& result);
+  
+  virtual void RecordProperty(const char* key, const char* value);
 
   virtual void SetUp();
   virtual void TearDown();
@@ -247,10 +244,19 @@ void TestRunnerImpl::TearDown() {
 	posix::Write(write_fd(), "E", 1);
 }
 
+// str can be NULL
 void SerializeString(const char* str, string* data) {
-	int32_t s = strlen(str); // TODO (dmeister) Use strnlen with constant for maximal path
-	data->append(reinterpret_cast<char*>(&s), sizeof(s));
-	data->append(str);
+  if(str != NULL) {
+    char null_flag = 1;
+    data->append(&null_flag, 1);
+    
+	  int32_t s = strlen(str); // TODO (dmeister) Use strnlen with constant for maximal path
+	  data->append(reinterpret_cast<char*>(&s), sizeof(s));
+	  data->append(str);
+  } else {
+    char null_flag = 0;
+    data->append(&null_flag, 1);
+  }
 }
 
 // Serializes a test part result into a string.
@@ -287,7 +293,17 @@ int SafeRead(int read_fd, char* output, int bytes_to_read) {
 	return total_bytes_read;
 }
 
-int ExtractStringFromStream(int read_fd, string* data) {
+int ExtractStringFromStream(int read_fd, String* data) {
+  char null_flag;
+  int bytes_null_flag_size = SafeRead(read_fd, &null_flag, 1);
+	if (bytes_null_flag_size <= 0) {
+		return bytes_null_flag_size;
+	}
+	if (null_flag == 0) {
+	  // str is NULL
+    *data = String(); // constructs a NULL string
+    return bytes_null_flag_size;
+	}
 	uint32_t size;
 	int bytes_read_size = SafeRead(read_fd, reinterpret_cast<char*>(&size), sizeof(size));
 	if (bytes_read_size <= 0) {
@@ -300,8 +316,8 @@ int ExtractStringFromStream(int read_fd, string* data) {
 		return bytes_read_string;
 	}
 	buffer[size] = 0;
-	data->assign(buffer);
-	return bytes_read_size + bytes_read_string;
+  *data = String(buffer);
+	return bytes_null_flag_size + bytes_read_size + bytes_read_string;
 }
 
 // returns -1 in case of an error, 0 if EOF is reached (unexpected), any positive integer
@@ -321,7 +337,7 @@ int ExtractTestPartResultFromStream(int read_fd, TestPartResult** result) {
 	} else if (type_flag == 'F') {
 		type = TestPartResult::kFatalFailure;
 	}
-	string filename;
+	String filename;
 	bytes_read = ExtractStringFromStream(read_fd, &filename);
 	if (bytes_read <= 0) {
 		return bytes_read;
@@ -333,7 +349,7 @@ int ExtractTestPartResultFromStream(int read_fd, TestPartResult** result) {
 		return bytes_read;
 	}
 	
-	string message;
+	String message;
 	bytes_read = ExtractStringFromStream(read_fd, &message);
 	if (bytes_read <= 0) {
 		return bytes_read;
@@ -371,30 +387,40 @@ void TestRunnerImpl::ReadAndInterpretStatusByte() {
     set_outcome(TEST_DIED);
 	  child_exited = true;
   } else if (bytes_read == 1) {
-    switch (flag) {
-	    case kTestRunnerTestPartResult:
-		    bytes_read = ExtractTestPartResultFromStream(read_fd(), &result);
-		    if (bytes_read > 0) {
-			    impl->GetGlobalTestPartResultReporter()->
+    if (flag == kTestRunnerTestPartResult) {
+		  bytes_read = ExtractTestPartResultFromStream(read_fd(), &result);
+      GTEST_TEST_RUNNER_CHECK_(bytes_read > 0);
+			
+			impl->GetGlobalTestPartResultReporter()->
 		        ReportTestPartResult(*result);
-		    }
-        WriteAcknowledge(write_fd());
-		    break;
-	    case kTestRunnerClearTestResult:
-	      TestResultAccessor::ClearTestPartResults(
+		  WriteAcknowledge(write_fd());
+		} else if (flag == kTestRunnerTestProperty) {
+      String key;
+      bytes_read = ExtractStringFromStream(read_fd(), &key);
+      GTEST_TEST_RUNNER_CHECK_(bytes_read > 0);
+      String value;
+      bytes_read = ExtractStringFromStream(read_fd(), &value);
+      GTEST_TEST_RUNNER_CHECK_(bytes_read > 0);
+        
+      // this is no infinite loop because current_test_runner() is always only set in the
+      // subprocess
+      impl->current_test_result()->RecordProperty(TestProperty(key.c_str(), value.c_str()));
+        
+      WriteAcknowledge(write_fd());  
+    } else if (flag == kTestRunnerClearTestResult) {
+	    TestResultAccessor::ClearTestPartResults(
              GetUnitTestImpl()->current_test_result());
-        WriteAcknowledge(write_fd());
-	    case kTestRunnerExited:
-		    // We use an explicit exit marker message instead of the exit code of the test
-		    // to avoid counting exit(0) calls in the user test as successful tests
-		    set_outcome(TEST_EXITED);
-		    child_exited = true;
-	      break;
-      default:
-	      child_exited = true;
-        GTEST_LOG_(FATAL) << "Test child process reported "
-                          << "unexpected status byte ("
-                          << static_cast<unsigned int>(flag) << ")";
+      WriteAcknowledge(write_fd());
+    } else if (flag == kTestRunnerExited) {
+		  // We use an explicit exit marker message instead of the exit code of the test
+		  // to avoid counting exit(0) calls in the user test as successful tests
+		  set_outcome(TEST_EXITED);
+		  child_exited = true;
+	  } else {
+	    child_exited = true;
+      GTEST_LOG_(FATAL) << "Test child process reported "
+                        << "unexpected status byte ("
+                        << static_cast<unsigned int>(flag) << ")";
       }
     } else {
       GTEST_LOG_(FATAL) << "Read from death test child process failed: "
@@ -414,7 +440,7 @@ bool TestRunnerImpl::ProcessOutcome() {
   }
     
   const String error_message = GetCapturedStderr();
-    
+  fprintf(stderr, "%s", error_message.c_str());
   if (outcome() == TEST_EXITED) {
     // everything is fine
   } else if (outcome() == TEST_DIED) {
@@ -431,19 +457,19 @@ bool TestRunnerImpl::ProcessOutcome() {
 }
 
 void WaitForAcknowledge(int read_fd) {
-    char flag;
-    int read_bytes = posix::Read(read_fd, &flag, 1);
-    GTEST_TEST_RUNNER_CHECK_(read_bytes == 1);
-    GTEST_TEST_RUNNER_CHECK_(flag == 'A');
+  char flag;
+  int read_bytes = posix::Read(read_fd, &flag, 1);
+  GTEST_TEST_RUNNER_CHECK_(read_bytes == 1);
+  GTEST_TEST_RUNNER_CHECK_(flag == 'A');
 }
 
 // Called in child process only
 void TestRunnerImpl::ClearCurrentTestPartResults() {
-    GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
+  GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
 
 	// TODO (dmeister) Use a safe write method
 	posix::Write(write_fd(), "C", 1);
-    WaitForAcknowledge(read_fd());
+  WaitForAcknowledge(read_fd());
 }
 
 // Called in child process only
@@ -454,9 +480,26 @@ void TestRunnerImpl::ReportTestPartResult(const TestPartResult& result) {
 	data.append("R"); // for test part result
 	SerializeTestPartResult(result, &data);
 
-	// TODO (dmeister) Use a safe write method
+  fflush(stdout); // ensure ordering in output
+  fflush(stderr);
+  
 	posix::Write(write_fd(), data.data(), data.size());
-    WaitForAcknowledge(read_fd());
+  WaitForAcknowledge(read_fd());
+}
+
+void TestRunnerImpl::RecordProperty(const char* key, const char* value) {
+  GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
+  	
+  string data;
+  data.append(&kTestRunnerTestProperty, 1);
+  SerializeString(key, &data);
+  SerializeString(value, &data);
+
+  fflush(stdout); // ensure ordering in output
+  fflush(stderr);
+  
+  posix::Write(write_fd(), data.data(), data.size());
+  WaitForAcknowledge(read_fd());
 }
 
 // ForkingTestRunner provides implementations for most of the abstract
@@ -568,8 +611,8 @@ bool DefaultTestRunnerFactory::Create(TestRunner** test_runner) {
   }
 # if GTEST_HAS_CRASH_SAFE_TEST_RUNNER
   *test_runner = new NoExecTestRunner();
-#else
-  GTEST_LOG_(FATAL) << "Crash safe test execution is currently not supported on this platform".;
+# else
+  GTEST_LOG_(FATAL) << "Crash safe test execution is currently not supported on this platform.";
   return false;
 # endif  // GTEST_HAS_CRASH_SAFE_TEST_RUNNER
   return true;

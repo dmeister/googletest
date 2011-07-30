@@ -292,9 +292,6 @@ class GTestOutputTest(gtest_test_utils.TestCase):
     # We still have to remove type name specifics in all cases.
     normalized_actual = RemoveTypeInfoDetails(output)
     normalized_golden = RemoveTypeInfoDetails(golden)
-    
-    open("a.txt","w").write(normalized_actual)
-    open("g.txt","w").write(normalized_golden)
 
     if CAN_GENERATE_GOLDEN_FILE:
       self.assertEqual(normalized_golden, normalized_actual)

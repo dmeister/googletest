@@ -93,6 +93,8 @@ class TestRunner {
   virtual bool ProcessOutcome() = 0;
 
   virtual void ReportTestPartResult(const TestPartResult& result) = 0;
+  
+  virtual void RecordProperty(const char* key, const char* value) = 0;
 
   virtual void SetUp() = 0;
 
@@ -103,15 +105,7 @@ class TestRunner {
    */
   virtual void ClearCurrentTestPartResults() = 0;
 
-  // Returns a human-readable outcome message regarding the outcome of
-  // the last test.
-  static const char* LastMessage();
-
-  static void set_last_test_message(const String& message);
-
  private:
-  // A string containing a description of the outcome of the last test.
-  static String last_test_message_;
 
   GTEST_DISALLOW_COPY_AND_ASSIGN_(TestRunner);
 };

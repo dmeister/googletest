@@ -2158,35 +2158,35 @@ void Test::Run() {
   ::testing::internal::TestRunner* gtest_tr;
   if (!::testing::internal::TestRunner::Create(&gtest_tr)) {
   	// TODO (dmeister) Error handling
+    GTEST_LOG_(FATAL) << "Failed to create test runner";
   } else {
-	impl->set_current_test_runner(gtest_tr);
-	::testing::internal::scoped_ptr< ::testing::internal::TestRunner> gtest_tr_ptr(gtest_tr);
-      switch (gtest_tr->AssumeRole()) {
-        case ::testing::internal::TestRunner::OVERSEE_TEST:
-		  gtest_tr->Wait();
-		  if (!gtest_tr->ProcessOutcome()) {
-			// TODO (dmeister) Error handling
-		  }
-          break;
-        case ::testing::internal::TestRunner::EXECUTE_TEST: {
-			gtest_tr->SetUp();
+	  ::testing::internal::scoped_ptr< ::testing::internal::TestRunner> gtest_tr_ptr(gtest_tr);
+    switch (gtest_tr->AssumeRole()) {
+      case ::testing::internal::TestRunner::OVERSEE_TEST:
+		    gtest_tr->Wait();
+		    if (!gtest_tr->ProcessOutcome()) {
+			    // TODO (dmeister) Error handling
+		    }
+        break;
+      case ::testing::internal::TestRunner::EXECUTE_TEST: {
+        impl->set_current_test_runner(gtest_tr);
+			  gtest_tr->SetUp();
 	
-			// replace test part result reporter by test runner enabled variant
-			TestPartResultReporterInterface* old_reporter = impl->GetGlobalTestPartResultReporter();
-			::testing::internal::TestRunnerTestPartResultReporter test_runner_reporter(
-				old_reporter, gtest_tr);
+			  // replace test part result reporter by test runner enabled variant
+			  TestPartResultReporterInterface* old_reporter = impl->GetGlobalTestPartResultReporter();
+			  ::testing::internal::TestRunnerTestPartResultReporter test_runner_reporter(
+				  old_reporter, gtest_tr);
 
-			impl->SetGlobalTestPartResultReporter(&test_runner_reporter);
+			  impl->SetGlobalTestPartResultReporter(&test_runner_reporter);
 	
 			  internal::HandleExceptionsInMethodIfSupported(this, &Test::SetUp, "SetUp()");
 			  // We will run the test only if SetUp() was successful.
 			  if (!HasFatalFailure()) {
 			    impl->os_stack_trace_getter()->UponLeavingGTest();
-			
+
 			    internal::HandleExceptionsInMethodIfSupported(
 			        this, &Test::TestBody, "the test body");
 			  }
-
 			  // However, we want to clean up as much as possible.  Hence we will
 			  // always call TearDown(), even if SetUp() or the test body has
 			  // failed.
@@ -2197,14 +2197,13 @@ void Test::Run() {
 	
 			  impl->SetGlobalTestPartResultReporter(old_reporter);
 			  gtest_tr->TearDown();
+		    impl->set_current_test_runner(NULL);
 			}			
-          break;
+      break;
 		default:
 			// TODO (dmeister) Should not happen
-		break;
-        }
-
-		impl->set_current_test_runner(NULL);
+		  break;
+    }
 	} 
 }
 
@@ -3849,6 +3848,10 @@ void UnitTest::AddTestPartResult(TestPartResult::Type result_type,
 void UnitTest::RecordPropertyForCurrentTest(const char* key,
                                             const char* value) {
   const TestProperty test_property(key, value);
+  
+  if (impl_->current_test_runner()) {
+    impl_->current_test_runner()->RecordProperty(key, value);
+  }
   impl_->current_test_result()->RecordProperty(test_property);
 }
 
@@ -4765,6 +4768,11 @@ static const char kColorEncodedHelpMessage[] =
 "  @G--" GTEST_FLAG_PREFIX_ "random_seed=@Y[NUMBER]@D\n"
 "      Random number seed to use for shuffling test orders (between 1 and\n"
 "      99999, or 0 to use a seed based on the current time).\n"
+#if GTEST_HAS_CRASH_SAFE_TEST_RUNNER
+"  @G--" GTEST_FLAG_PREFIX_ "crash_safe=@Ytrue@D\n"
+"      Executes all test in isolated subprocessed. If a test crashes or otherwise"
+"       exits the test process, the testing is continued with the next text (on OS X, Linux)\n"
+#endif
 "\n"
 "Test Output:\n"
 "  @G--" GTEST_FLAG_PREFIX_ "color=@Y(@Gyes@Y|@Gno@Y|@Gauto@Y)@D\n"
