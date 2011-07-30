@@ -231,6 +231,9 @@ if (gtest_build_tests)
   cxx_executable(gtest_shuffle_test_ test gtest)
   py_test(gtest_shuffle_test)
 
+  cxx_executable(gtest_crash_safe_test_ test gtest)
+  py_test(gtest_crash_safe_test)
+
   # MSVC 7.1 does not support STL with exceptions disabled.
   if (NOT MSVC OR MSVC_VERSION GREATER 1310)
     cxx_executable(gtest_throw_on_failure_test_ test gtest_no_exception)

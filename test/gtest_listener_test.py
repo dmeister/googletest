@@ -123,16 +123,13 @@ expected_events = [
 class GTestListenerTest(gtest_test_utils.TestCase):
   """Unit test for Google Test's listener functionality."""
 
-  def setUp(self):
-      pass
-
-  def tearDown(self):
-      pass
-
   def ExtractListenerEvents(self, output):
-      return [line[2] for line in 
-                filter(lambda line: line[1], (line.partition("Event: ") for line in 
-                    output.split("\n")))]
+    """ Extract the listenver events written by the test's test bodies
+        from the process output
+    """
+    return [line[2] for line in 
+      filter(lambda line: line[1], (line.partition("Event: ") for line in 
+        output.split("\n")))]
       
   def VerifyResults(self, actual_events):    
     for (expected_event, actual_event) in zip(expected_events, actual_events):
@@ -140,13 +137,13 @@ class GTestListenerTest(gtest_test_utils.TestCase):
     self.assertEqual(len(expected_events), len(actual_events))
     
   def testListener(self):
-      command = [COMMAND]
-      p = gtest_test_utils.Subprocess(command)
-      self.assert_(p.exited)
-      self.assertEquals(0, p.exit_code)
+    command = [COMMAND]
+    p = gtest_test_utils.Subprocess(command)
+    self.assert_(p.exited)
+    self.assertEquals(0, p.exit_code)
       
-      actual_events = self.ExtractListenerEvents(p.output)
-      self.VerifyResults(actual_events);
+    actual_events = self.ExtractListenerEvents(p.output)
+    self.VerifyResults(actual_events);
 
 if __name__ == "__main__":
   gtest_test_utils.Main()

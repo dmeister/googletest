@@ -195,6 +195,9 @@ find_package(PythonInterp)
 function(cxx_test_with_flags name cxx_flags libs)
   cxx_executable_with_flags(${name} "${cxx_flags}" "${libs}" ${ARGN})
   add_test(${name} ${name})
+
+  add_test(${name}-crash-safe
+	   ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/gtest_run_as_crash_safe.py ${name})
 endfunction()
 
 # cxx_test(name libs srcs...)
@@ -222,5 +225,10 @@ function(py_test name)
     add_test(${name}
       ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/${name}.py
           --build_dir=${CMAKE_CURRENT_BINARY_DIR}/\${CTEST_CONFIGURATION_TYPE})
+
+	add_test(${name}-crash-safe
+	   ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/gtest_run_as_crash_safe.py
+			${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/${name}.py
+	       --build_dir=${CMAKE_CURRENT_BINARY_DIR}/\${CTEST_CONFIGURATION_TYPE})
   endif()
 endfunction()
