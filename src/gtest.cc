@@ -661,7 +661,7 @@ DefaultGlobalTestPartResultReporter::DefaultGlobalTestPartResultReporter(
     UnitTestImpl* unit_test) : unit_test_(unit_test) {}
 
 void DefaultGlobalTestPartResultReporter::ReportTestPartResult(
-    const TestPartResult& result) {
+    const TestPartResult& result) {    
   unit_test_->current_test_result()->AddTestPartResult(result);
   unit_test_->listeners()->repeater()->OnTestPartResult(result);
 }
@@ -1875,7 +1875,7 @@ static bool TestPartNonfatallyFailed(const TestPartResult& result) {
 
 // Returns true iff the test has a non-fatal failure.
 bool TestResult::HasNonfatalFailure() const {
-  return CountIf(test_part_results_, TestPartNonfatallyFailed) > 0;
+    return CountIf(test_part_results_, TestPartNonfatallyFailed) > 0;
 }
 
 // Gets the number of all test parts.  This is the sum of the number
@@ -2172,14 +2172,17 @@ void Test::Run() {
 			gtest_tr->SetUp();
 	
 			// replace test part result reporter by test runner enabled variant
-			::testing::internal::TestRunnerTestPartResultReporter test_runner_reporter(gtest_tr);
 			TestPartResultReporterInterface* old_reporter = impl->GetGlobalTestPartResultReporter();
+			::testing::internal::TestRunnerTestPartResultReporter test_runner_reporter(
+				old_reporter, gtest_tr);
+
 			impl->SetGlobalTestPartResultReporter(&test_runner_reporter);
 	
 			  internal::HandleExceptionsInMethodIfSupported(this, &Test::SetUp, "SetUp()");
 			  // We will run the test only if SetUp() was successful.
 			  if (!HasFatalFailure()) {
 			    impl->os_stack_trace_getter()->UponLeavingGTest();
+			
 			    internal::HandleExceptionsInMethodIfSupported(
 			        this, &Test::TestBody, "the test body");
 			  }
@@ -2188,13 +2191,13 @@ void Test::Run() {
 			  // always call TearDown(), even if SetUp() or the test body has
 			  // failed.
 			  impl->os_stack_trace_getter()->UponLeavingGTest();
+			
 			  internal::HandleExceptionsInMethodIfSupported(
 			      this, &Test::TearDown, "TearDown()");
 	
 			  impl->SetGlobalTestPartResultReporter(old_reporter);
-			  }	
-			
-			gtest_tr->TearDown();
+			  gtest_tr->TearDown();
+			}			
           break;
 		default:
 			// TODO (dmeister) Should not happen
@@ -4841,7 +4844,15 @@ void ParseGoogleTestFlagsOnlyImpl(int* argc, CharType** argv) {
         ParseStringFlag(arg, kStreamResultToFlag,
                         &GTEST_FLAG(stream_result_to)) ||
         ParseBoolFlag(arg, kThrowOnFailureFlag,
-                      &GTEST_FLAG(throw_on_failure))
+                      &GTEST_FLAG(throw_on_failure)) ||
+        ParseBoolFlag(arg, kCrashSafeFlag,
+                      &GTEST_FLAG(crash_safe)) ||
+        ParseStringFlag(arg, kCrashSafeStyleFlag,
+                      &GTEST_FLAG(crash_safe_style)) ||
+        ParseBoolFlag(arg, kCrashSafeUseFork,
+                      &GTEST_FLAG(crash_safe_use_fork)) ||
+        ParseStringFlag(arg, kInternalCrashSafeFlag,
+                      &GTEST_FLAG(internal_crash_safe))
         ) {
       // Yes.  Shift the remainder of the argv list left by one.  Note
       // that argv has (*argc + 1) elements, the last one always being

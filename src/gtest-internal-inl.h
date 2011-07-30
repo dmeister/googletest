@@ -1054,7 +1054,7 @@ class TestResultAccessor {
     test_result->RecordProperty(property);
   }
 
-  static void ClearTestPartResults(TestResult* test_result) {
+  static void ClearTestPartResults(TestResult* test_result) {      
     test_result->ClearTestPartResults();
   }
 

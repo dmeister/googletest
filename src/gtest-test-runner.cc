@@ -71,11 +71,16 @@ namespace testing {
 // Constants.
 
 // The default test runner style.
-static const char kDefaultTestRunnerStyle[] = "fast";
+static const char kDefaultCrashSafeTestRunnerStyle[] = "fast";
+
+GTEST_DEFINE_bool_(
+    crash_safe,
+    internal::BoolFromGTestEnv("crash_safe", false),
+    "TODO");
 
 GTEST_DEFINE_string_(
-    test_runner_style,
-    internal::StringFromGTestEnv("test_runner_style", kDefaultTestRunnerStyle),
+    crash_safe_style,
+    internal::StringFromGTestEnv("crash_safe_style", kDefaultCrashSafeTestRunnerStyle),
     "Indicates how to run a test in a forked child process: "
     "\"threadsafe\" (child process re-executes the test binary "
     "from the beginning, running only the specific test) or "
@@ -83,8 +88,8 @@ GTEST_DEFINE_string_(
     "after forking).");
 
 GTEST_DEFINE_bool_(
-    test_runner_use_fork,
-    internal::BoolFromGTestEnv("test_runner_use_fork", false),
+    crash_safe_use_fork,
+    internal::BoolFromGTestEnv("crash_safe_use_fork", false),
     "Instructs to use fork()/_exit() instead of clone() in tests. "
     "Ignored and always uses fork() on POSIX systems where clone() is not "
     "implemented. Useful when running under valgrind or similar tools if "
@@ -96,7 +101,7 @@ GTEST_DEFINE_bool_(
 
 namespace internal {
 GTEST_DEFINE_string_(
-    internal_test_runner, "",
+    internal_crash_safe, "",
     "Indicates the file, line number, temporal index of "
     "the single test to run, and a file descriptor to "
     "which a success code may be sent, all separated by "
@@ -112,6 +117,7 @@ namespace internal {
 static const char kTestRunnerTestPartResult = 'R';
 static const char kTestRunnerExited = 'E';
 static const char kTestRunnerInternalError = 'I';
+static const char kTestRunnerClearTestResult = 'C';
 
 // An enumeration describing all of the possible ways that a death test can
 // conclude.  DIED means that the process died while executing the test
@@ -199,12 +205,42 @@ void TestRunner::set_last_test_message(const String& message) {
 
 String TestRunner::last_test_message_;
 
+// Basic direct (non crash safe) test runner implementation
+class DirectTestRunner : public TestRunner {
+public:
+  virtual Role AssumeRole() {
+	// There is no overseeing in the direct test runner
+	return EXECUTE_TEST;
+  }
+
+  virtual int Wait() {
+    TestRunnerAbort("Should never be called");
+	  return 0;
+  }
+
+  virtual bool ProcessOutcome() {
+	  return true;
+  }
+
+  virtual void ReportTestPartResult(const TestPartResult& /*result*/) {
+    // There is no parent process we have to forward the test part result
+  }
+
+  virtual void SetUp() {
+  }
+
+  virtual void TearDown() {
+  }
+  
+  virtual void ClearCurrentTestPartResults() {
+  }
+};
+
 // Provides cross platform implementation for some test runner functionality.
 class TestRunnerImpl : public TestRunner {
  protected:
   TestRunnerImpl() :
         spawned_(false),
-        status_(-1),
         outcome_(TEST_IN_PROGRESS),
         read_fd_(-1),
         write_fd_(-1) {}
@@ -214,8 +250,6 @@ class TestRunnerImpl : public TestRunner {
 
   bool spawned() const { return spawned_; }
   void set_spawned(bool is_spawned) { spawned_ = is_spawned; }
-  int status() const { return status_; }
-  void set_status(int a_status) { status_ = a_status; }
   TestRunnerOutcome outcome() const { return outcome_; }
   void set_outcome(TestRunnerOutcome an_outcome) { outcome_ = an_outcome; }
   int read_fd() const { return read_fd_; }
@@ -236,11 +270,11 @@ class TestRunnerImpl : public TestRunner {
   virtual void SetUp();
   virtual void TearDown();
 
+  virtual void ClearCurrentTestPartResults();
+
  private:
   // True if the death test child process has been successfully spawned.
   bool spawned_;
-  // The exit status of the child process.
-  int status_;
   // How the test runner concluded.
   TestRunnerOutcome outcome_;
   // Descriptor to the read end of the pipe to the child process.  It is
@@ -359,6 +393,10 @@ int ExtractTestPartResultFromStream(int read_fd, TestPartResult** result) {
 	return 1; // any positive integer is ok
 }
 
+void WriteAcknowledge(int write_fd) {
+    posix::Write(write_fd, "A", 1);
+}
+
 // Called in the parent process only. Reads the result code of the death
 // test child process via a pipe, interprets it to set the outcome_
 // member, and closes read_fd_.  Outputs diagnostics and terminates in
@@ -375,8 +413,7 @@ void TestRunnerImpl::ReadAndInterpretStatusByte() {
   do {
     bytes_read = posix::Read(read_fd(), &flag, 1);
   } while (bytes_read == -1 && errno == EINTR);
-
-  if (bytes_read == 0) {
+  if (bytes_read == 0) {	
     set_outcome(TEST_DIED);
 	child_exited = true;
   } else if (bytes_read == 1) {
@@ -384,11 +421,18 @@ void TestRunnerImpl::ReadAndInterpretStatusByte() {
 	  case kTestRunnerTestPartResult:
 		bytes_read = ExtractTestPartResultFromStream(read_fd(), &result);
 		if (bytes_read > 0) {
-			impl->GetTestPartResultReporterForCurrentThread()->
+			impl->GetGlobalTestPartResultReporter()->
 		      ReportTestPartResult(*result);
 		}
+        WriteAcknowledge(write_fd());
 		break;
+	  case kTestRunnerClearTestResult:
+	     TestResultAccessor::ClearTestPartResults(
+             GetUnitTestImpl()->current_test_result());
+        WriteAcknowledge(write_fd());
 	  case kTestRunnerExited:
+		  // We use an explicit exit marker message instead of the exit code of the test
+		  // to avoid counting exit(0) calls in the user test as successful tests
 		  set_outcome(TEST_EXITED);
 		  child_exited = true;
 	    break;
@@ -409,23 +453,46 @@ void TestRunnerImpl::ReadAndInterpretStatusByte() {
   }
   GTEST_TEST_RUNNER_CHECK_SYSCALL_(posix::Close(read_fd()));
   set_read_fd(-1);
+  GTEST_TEST_RUNNER_CHECK_SYSCALL_(posix::Close(write_fd()));
+  set_write_fd(-1);
 }
 
 bool TestRunnerImpl::ProcessOutcome() {
-	if (!spawned())
-	    return false;
-	  switch (outcome()) {
-		case TEST_EXITED:
-			// everything is fine
-		break;
-	  case TEST_DIED:
-		GTEST_LOG_(FATAL) << "Child process died";
-		break;
-	  default:
-	GTEST_LOG_(FATAL) << "Unexpected child process outcome";
-	break;
+	if (!spawned()) {
+    return false;
+  }
+    
+  const String error_message = GetCapturedStderr();
+    
+  if (outcome() == TEST_EXITED) {
+    // everything is fine
+  } else if (outcome() == TEST_DIED) {
+    const TestInfo* test_info = UnitTest::GetInstance()->current_test_info();
+    Message msg;
+    msg << "Test process died while executing " << 
+      test_info->test_case_name() << "." << test_info->name();
+	  ReportFailureInUnknownLocation(TestPartResult::kFatalFailure,
+                          msg.GetString());
+  } else {
+	    GTEST_LOG_(FATAL) << "Unexpected child process outcome";
 	}
 	return true;
+}
+
+void WaitForAcknowledge(int read_fd) {
+    char flag;
+    int read_bytes = posix::Read(read_fd, &flag, 1);
+    GTEST_TEST_RUNNER_CHECK_(read_bytes == 1);
+    GTEST_TEST_RUNNER_CHECK_(flag == 'A');
+}
+
+// Called in child process only
+void TestRunnerImpl::ClearCurrentTestPartResults() {
+    GTEST_TEST_RUNNER_CHECK_(write_fd() != -1);
+
+	// TODO (dmeister) Use a safe write method
+	posix::Write(write_fd(), "C", 1);
+    WaitForAcknowledge(read_fd());
 }
 
 // Called in child process only
@@ -438,6 +505,7 @@ void TestRunnerImpl::ReportTestPartResult(const TestPartResult& result) {
 
 	// TODO (dmeister) Use a safe write method
 	posix::Write(write_fd(), data.data(), data.size());
+    WaitForAcknowledge(read_fd());
 }
 
 # if GTEST_OS_WINDOWS
@@ -507,7 +575,7 @@ int WindowsTestRunner::Wait() {
     case WAIT_OBJECT_0 + 1:
       break;
     default:
-      GTEST_TeST_RUNNER_CHECK_(false);  // Should not get here.
+      GTEST_TEST_RUNNER_CHECK_(false);  // Should not get here.
   }
 
   // The child has acquired the write end of the pipe or exited.
@@ -526,10 +594,9 @@ int WindowsTestRunner::Wait() {
                                              INFINITE));
   DWORD status_code;
   GTEST_DEATH_TEST_CHECK_(
-      ::GetExitCodeProcess(child_handle_.Get(), &status_code) != FALSE);
+	::GetExitCodeProcess(child_handle_.Get(), &status_code) != FALSE);
   child_handle_.Reset();
-  set_status(static_cast<int>(status_code));
-  return status();
+  return status_code;
 }
 
 // The AssumeRole process for a Windows death test.  It creates a child
@@ -657,8 +724,7 @@ int ForkingTestRunner::Wait() {
   ReadAndInterpretStatusByte();
 
   int status_value;
-  GTEST_TEST_RUNNER_CHECK_SYSCALL_(waitpid(child_pid_, &status_value, 0));
-  set_status(status_value);
+  GTEST_DEATH_TEST_CHECK_SYSCALL_(waitpid(child_pid_, &status_value, 0));
   return status_value;
 }
 
@@ -675,15 +741,29 @@ class NoExecTestRunner : public ForkingTestRunner {
 // The AssumeRole process for a fork-and-run death test.  It implements a
 // straightforward fork, with a simple pipe to transmit the status byte.
 TestRunner::Role NoExecTestRunner::AssumeRole() {
-  int pipe_fd[2];
-  GTEST_TEST_RUNNER_CHECK_(pipe(pipe_fd) != -1);
+  int in_pipe_fd[2];
+  GTEST_TEST_RUNNER_CHECK_(pipe(in_pipe_fd) != -1);
+  int out_pipe_fd[2];
+  GTEST_TEST_RUNNER_CHECK_(pipe(out_pipe_fd) != -1);
+
+  CaptureStderr();
+  // When we fork the process below, the log file buffers are copied, but the
+  // file descriptors are shared.  We flush all log files here so that closing
+  // the file descriptors in the child process doesn't throw off the
+  // synchronization between descriptors and buffers in the parent process.
+  // This is as close to the fork as possible to avoid a race condition in case
+  // there are multiple threads running before the death test, and another
+  // thread writes to the log file.
+  FlushInfoLog();
 
   const pid_t child_pid = fork();
   GTEST_TEST_RUNNER_CHECK_(child_pid != -1);
   set_child_pid(child_pid);
-  if (child_pid == 0) {
-    GTEST_TEST_RUNNER_CHECK_SYSCALL_(close(pipe_fd[0]));
-    set_write_fd(pipe_fd[1]);
+  if (child_pid == 0) {	
+    GTEST_TEST_RUNNER_CHECK_SYSCALL_(close(out_pipe_fd[0]));
+    GTEST_TEST_RUNNER_CHECK_SYSCALL_(close(in_pipe_fd[1]));
+    set_write_fd(out_pipe_fd[1]);
+    set_read_fd(in_pipe_fd[0]);
     // Redirects all logging to stderr in the child process to prevent
     // concurrent writes to the log files.  We capture stderr in the parent
     // process and append the child process' output to a log.
@@ -693,8 +773,10 @@ TestRunner::Role NoExecTestRunner::AssumeRole() {
     GetUnitTestImpl()->listeners()->SuppressEventForwarding();
     return EXECUTE_TEST;
   } else {
-    GTEST_TEST_RUNNER_CHECK_SYSCALL_(close(pipe_fd[1]));
-    set_read_fd(pipe_fd[0]);
+    GTEST_TEST_RUNNER_CHECK_SYSCALL_(close(out_pipe_fd[1]));
+    GTEST_TEST_RUNNER_CHECK_SYSCALL_(close(in_pipe_fd[0]));
+    set_read_fd(out_pipe_fd[0]);
+    set_write_fd(in_pipe_fd[1]);
     set_spawned(true);
     return OVERSEE_TEST;
   }
@@ -862,7 +944,7 @@ TestRunner::Role ExecTestRunner::AssumeRole() {
                      info->test_case_name(), info->name());
   const String internal_flag =
       String::Format("--%s%s=%d",
-                     GTEST_FLAG_PREFIX_, kInternalTestRunnerFlag, pipe_fd[1]);
+                     GTEST_FLAG_PREFIX_, kInternalCrashSafeFlag, pipe_fd[1]);
 
   Arguments args;
   args.AddArguments(GetArgvs());
@@ -889,20 +971,24 @@ TestRunner::Role ExecTestRunner::AssumeRole() {
 // by the "test" argument to its address.  If the test should be
 // skipped, sets that pointer to NULL.  Returns true, unless the
 // flag is set to an invalid value.
-bool DefaultTestRunnerFactory::Create(TestRunner** test) {
+bool DefaultTestRunnerFactory::Create(TestRunner** test_runner) {
+  if (!GTEST_FLAG(crash_safe)) {
+    *test_runner = new DirectTestRunner();
+    return true;
+  }
 # if GTEST_OS_WINDOWS
 
-  if (GTEST_FLAG(test_runner_style) == "threadsafe" ||
-      GTEST_FLAG(test_runner_style) == "fast") {
-    *test = new WindowsTestRunner();
+  if (GTEST_FLAG(crash_safe_style) == "threadsafe" ||
+      GTEST_FLAG(crash_safe_style) == "fast") {
+    *test_runner = new WindowsTestRunner();
   }
 
 # else
 
-  if (GTEST_FLAG(test_runner_style) == "threadsafe") {
-    *test = new ExecTestRunner();
-  } else if (GTEST_FLAG(test_runner_style) == "fast") {
-    *test = new NoExecTestRunner();
+  if (GTEST_FLAG(crash_safe_style) == "threadsafe") {
+    *test_runner = new ExecTestRunner();
+  } else if (GTEST_FLAG(crash_safe_style) == "fast") {
+    *test_runner = new NoExecTestRunner();
   }
 
 # endif  // GTEST_OS_WINDOWS
@@ -985,12 +1071,12 @@ int GetTestRunnerStatusFileDescriptor(unsigned int parent_process_id,
 // initialized from the GTEST_FLAG(internal_test_runner) flag if
 // the flag is specified; otherwise returns NULL.
 InternalTestRunnerFlag* ParseInternalTestRunnerFlag() {
-  if (GTEST_FLAG(internal_test_runner) == "") return NULL;
+  if (GTEST_FLAG(internal_crash_safe) == "") return NULL;
 
   // GTEST_HAS_DEATH_TEST implies that we have ::std::string, so we
   // can use it here.
   ::std::vector< ::std::string> fields;
-  SplitString(GTEST_FLAG(internal_test_runner).c_str(), '|', &fields);
+  SplitString(GTEST_FLAG(internal_crash_safe).c_str(), '|', &fields);
   int write_fd = -1;
 
 # if GTEST_OS_WINDOWS
@@ -1015,8 +1101,8 @@ InternalTestRunnerFlag* ParseInternalTestRunnerFlag() {
   if (fields.size() != 2
       || !ParseNaturalNumber(fields[1], &write_fd)) {
     TestRunnerAbort(String::Format(
-        "Bad --gtest_internal_test_runner flag: %s",
-        GTEST_FLAG(internal_test_runner).c_str()));
+        "Bad --gtest_internal_crash_safe flag: %s",
+        GTEST_FLAG(internal_crash_safe).c_str()));
   }
 
 # endif  // GTEST_OS_WINDOWS
@@ -1025,6 +1111,7 @@ InternalTestRunnerFlag* ParseInternalTestRunnerFlag() {
 }
 
 void TestRunnerTestPartResultReporter::ReportTestPartResult(const TestPartResult& result) {
+	original_reporter_->ReportTestPartResult(result);
 	test_runner_->ReportTestPartResult(result);
 }
 

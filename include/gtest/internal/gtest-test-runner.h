@@ -42,16 +42,25 @@
 #include <stdio.h>
 
 namespace testing {
+
+GTEST_DECLARE_bool_(crash_safe);
+GTEST_DECLARE_string_(crash_safe_style);
+GTEST_DECLARE_bool_(crash_safe_use_fork);
+
 namespace internal {
 
-GTEST_DECLARE_string_(internal_run_test_runner);
+GTEST_DECLARE_string_(internal_crash_safe);
+
 
 // Names of the flags (needed for parsing Google Test flags).
-const char kTestRunnerStyleFlag[] = "test_runner_style";
-const char kTestRunnerUseFork[] = "test_runner_use_fork";
-const char kInternalTestRunnerFlag[] = "internal_test_runner";
+const char kCrashSafeFlag[] = "crash_safe";
+const char kCrashSafeStyleFlag[] = "crash_safe_style";
+const char kCrashSafeUseFork[] = "crash_safe_use_fork";
+const char kInternalCrashSafeFlag[] = "internal_crash_safe";
 
 #if GTEST_HAS_DEATH_TEST
+
+
 
 // DeathTest is a class that hides much of the complexity of the
 // GTEST_DEATH_TEST_ macro.  It is abstract; its static Create method
@@ -90,7 +99,7 @@ class TestRunner {
   // Assumes one of the above roles.
   virtual Role AssumeRole() = 0;
 
-  // Waits for the test runner to finish and returns its status.
+  // Waits for the test runner to finish.
   virtual int Wait() = 0;
 
   virtual bool ProcessOutcome() = 0;
@@ -100,6 +109,11 @@ class TestRunner {
   virtual void SetUp() = 0;
 
   virtual void TearDown() = 0;
+  
+  /**
+   * Used internally for testing purposes
+   */
+  virtual void ClearCurrentTestPartResults() = 0;
 
   // Returns a human-readable outcome message regarding the outcome of
   // the last test.
@@ -150,18 +164,20 @@ class InternalTestRunnerFlag {
 
 class TestRunnerTestPartResultReporter : public TestPartResultReporterInterface {
   public:
-	inline TestRunnerTestPartResultReporter(TestRunner* test_runner);
+	inline TestRunnerTestPartResultReporter(TestPartResultReporterInterface* original_reporter,
+		TestRunner* test_runner);
 	
 	virtual void ReportTestPartResult(const TestPartResult& result);
   private:
-	
+	TestPartResultReporterInterface* original_reporter_;
 	TestRunner* test_runner_;
 		
 	// Copy and assign is ok
 };
 
-TestRunnerTestPartResultReporter::TestRunnerTestPartResultReporter(TestRunner* test_runner) 
- : test_runner_(test_runner) {
+TestRunnerTestPartResultReporter::TestRunnerTestPartResultReporter(
+	TestPartResultReporterInterface* original_reporter,TestRunner* test_runner) 
+ : original_reporter_(original_reporter), test_runner_(test_runner) {
 }
 
 // Returns a newly created ParseInternalTestRunnerFlag object with fields
