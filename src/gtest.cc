@@ -4846,13 +4846,7 @@ void ParseGoogleTestFlagsOnlyImpl(int* argc, CharType** argv) {
         ParseBoolFlag(arg, kThrowOnFailureFlag,
                       &GTEST_FLAG(throw_on_failure)) ||
         ParseBoolFlag(arg, kCrashSafeFlag,
-                      &GTEST_FLAG(crash_safe)) ||
-        ParseStringFlag(arg, kCrashSafeStyleFlag,
-                      &GTEST_FLAG(crash_safe_style)) ||
-        ParseBoolFlag(arg, kCrashSafeUseFork,
-                      &GTEST_FLAG(crash_safe_use_fork)) ||
-        ParseStringFlag(arg, kInternalCrashSafeFlag,
-                      &GTEST_FLAG(internal_crash_safe))
+                      &GTEST_FLAG(crash_safe))
         ) {
       // Yes.  Shift the remainder of the argv list left by one.  Note
       // that argv has (*argc + 1) elements, the last one always being

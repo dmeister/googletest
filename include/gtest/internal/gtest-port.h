@@ -554,6 +554,11 @@
 # include <vector>  // NOLINT
 #endif
 
+// Determines wether to support crash-safe test execution
+#if (GTEST_OS_LINUX || GTEST_OS_MAC )
+# define GTEST_HAS_CRASH_SAFE_TEST_RUNNER 1
+#endif
+
 // We don't support MSVC 7.1 with exceptions disabled now.  Therefore
 // all the compilers we care about are adequate for supporting
 // value-parameterized tests.

@@ -749,27 +749,19 @@ class GTEST_API_ UnitTestImpl {
     return death_test_factory_.get();
   }
 
-  void InitTestRunnerSubprocessControlInfo() {
-	internal_test_runner_flag_.reset(ParseInternalTestRunnerFlag());
-  }
-
-  const InternalTestRunnerFlag* internal_test_runner_flag() const {
-	return internal_test_runner_flag_.get();	
-  }
-
   internal::TestRunnerFactory* test_runner_factory() {
-	return test_runner_factory_.get();	
+	  return test_runner_factory_.get();	
   }
 
   internal::TestRunner* current_test_runner() {
-	return current_test_runner_;
+	  return current_test_runner_;
   }
 
   // Sets the current test runner.
   // Only allowed in main thread.
   // Doesn't hand over ownership.
   void set_current_test_runner(TestRunner* test_runner) {
-	current_test_runner_ = test_runner;
+	  current_test_runner_ = test_runner;
   }
 
   void SuppressTestEventsIfInSubprocess();
@@ -915,12 +907,10 @@ class GTEST_API_ UnitTestImpl {
   // parsed when RUN_ALL_TESTS is called.
   internal::scoped_ptr<InternalRunDeathTestFlag> internal_run_death_test_flag_;
   internal::scoped_ptr<internal::DeathTestFactory> death_test_factory_;
-
-  internal::scoped_ptr<InternalTestRunnerFlag> internal_test_runner_flag_;
-  internal::scoped_ptr<internal::TestRunnerFactory> test_runner_factory_;
-
-  internal::TestRunner* current_test_runner_;
 #endif  // GTEST_HAS_DEATH_TEST
+
+  internal::scoped_ptr<internal::TestRunnerFactory> test_runner_factory_;
+  internal::TestRunner* current_test_runner_;
 
   // A per-thread stack of traces created by the SCOPED_TRACE() macro.
   internal::ThreadLocal<std::vector<TraceInfo> > gtest_trace_stack_;

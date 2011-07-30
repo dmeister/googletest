@@ -44,23 +44,11 @@
 namespace testing {
 
 GTEST_DECLARE_bool_(crash_safe);
-GTEST_DECLARE_string_(crash_safe_style);
-GTEST_DECLARE_bool_(crash_safe_use_fork);
 
 namespace internal {
 
-GTEST_DECLARE_string_(internal_crash_safe);
-
-
 // Names of the flags (needed for parsing Google Test flags).
 const char kCrashSafeFlag[] = "crash_safe";
-const char kCrashSafeStyleFlag[] = "crash_safe_style";
-const char kCrashSafeUseFork[] = "crash_safe_use_fork";
-const char kInternalCrashSafeFlag[] = "internal_crash_safe";
-
-#if GTEST_HAS_DEATH_TEST
-
-
 
 // DeathTest is a class that hides much of the complexity of the
 // GTEST_DEATH_TEST_ macro.  It is abstract; its static Create method
@@ -141,27 +129,6 @@ class DefaultTestRunnerFactory : public TestRunnerFactory {
   virtual bool Create(TestRunner** test_runner);
 };
 
-// A class representing the parsed contents of the
-// --gtest_internal_test_runner flag, as it existed when
-// RUN_ALL_TESTS was called.
-class InternalTestRunnerFlag {
- public:
-  InternalTestRunnerFlag(int a_write_fd) 
-       : write_fd_(a_write_fd) {}
-
-  ~InternalTestRunnerFlag() {
-    if (write_fd_ >= 0)
-      posix::Close(write_fd_);
-  }
-
-  int write_fd() const { return write_fd_; }
-
- private:
-  int write_fd_;
-
-  GTEST_DISALLOW_COPY_AND_ASSIGN_(InternalTestRunnerFlag);
-};
-
 class TestRunnerTestPartResultReporter : public TestPartResultReporterInterface {
   public:
 	inline TestRunnerTestPartResultReporter(TestPartResultReporterInterface* original_reporter,
@@ -179,13 +146,6 @@ TestRunnerTestPartResultReporter::TestRunnerTestPartResultReporter(
 	TestPartResultReporterInterface* original_reporter,TestRunner* test_runner) 
  : original_reporter_(original_reporter), test_runner_(test_runner) {
 }
-
-// Returns a newly created ParseInternalTestRunnerFlag object with fields
-// initialized from the GTEST_FLAG(internal_test_runner) flag if
-// the flag is specified; otherwise returns NULL.
-InternalTestRunnerFlag* ParseInternalTestRunnerFlag();
-
-#endif  // GTEST_HAS_DEATH_TEST
 
 }  // namespace internal
 }  // namespace testing
